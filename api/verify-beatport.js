@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 // Server-side verification of a MusicAPI hosted sign-in.
 // The endpoint stays disabled until the owner explicitly enables verification
 // after checking MusicAPI's pricing. No catalog, playlist or cart APIs are called.
@@ -40,7 +41,12 @@ export default async function handler(req,res){
     if(user?.integrationUser?.uuid!==actualId)return res.status(403).json({ok:false,error:'Connected-user identity mismatch'});
     const service=user?.integration?.type;
     if(typeof service!=='string'||service.toLowerCase()!=='beatport')return res.status(403).json({ok:false,error:'Connected service was not confirmed as Beatport'});
-    // Never return credentials or private profile fields.
+    // Bind the verified account to this browser using a short-lived signed HttpOnly cookie.
+    // This beta has no app-user login; never treat this as multi-user production auth.
+    const issued=Math.floor(Date.now()/1000),expires=issued+3600;
+    const body=Buffer.from(JSON.stringify({uid:actualId,exp:expires})).toString('base64url');
+    const sig=crypto.createHmac('sha256',secret).update('crateflow-beatport-v1.'+body).digest('base64url');
+    res.setHeader('Set-Cookie','cf_bp='+body+'.'+sig+'; Path=/api; Max-Age=3600; HttpOnly; Secure; SameSite=Lax');
     return res.status(200).json({ok:true,verified:true,serviceVerified:true,service:'beatport',verifiedAt:new Date().toISOString()});
   }catch{return res.status(502).json({ok:false,error:'Unable to contact MusicAPI verification endpoint'});}
   finally{clearTimeout(timer);}
