@@ -8,6 +8,7 @@
  const onMessage=async event=>{
   if(event.source!==window||event.origin!==APP_ORIGIN)return;
   const msg=event.data;
+  if(msg?.source==='crateflow-app'&&msg?.type==='PING'&&msg?.version===1){ready();return}
   if(!msg||msg.source!=='crateflow-app'||msg.type!=='QUEUE_PLAYLIST'||msg.version!==1)return;
   const {nonce,name,playlistId,count}=msg;
   if(typeof nonce!=='string'||!/^[A-Za-z0-9_-]{12,80}$/.test(nonce))return;
