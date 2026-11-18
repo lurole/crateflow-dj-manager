@@ -21,7 +21,7 @@ let catalogSearchBusy=false;
 async function searchCatalogTrack(t){
  const response=await fetch('/api/search-beatport',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({artist:t.artist,title:t.title})});
  const data=await response.json();
- if(!response.ok||!data.ok)throw Error((data.error||'Catalog lookup failed')+(data.providerStatus?' (MusicAPI HTTP '+data.providerStatus+(data.providerCode?', code '+data.providerCode:'')+')':''));
+ if(!response.ok||!data.ok)throw Error((data.error||'Catalog lookup failed')+(data.providerStatus?' (MusicAPI HTTP '+data.providerStatus+(data.providerCode?', code '+data.providerCode:'')+')':'')+(data.diagnostic==='unrecognized_response'?' [response: '+(data.responseFields||[]).join(', ')+'; data: '+(data.dataFields||[]).join(', ')+'; result: '+(data.resultFields||[]).join(', ')+']':''));
  const candidates=(data.candidates||[]).map(c=>({
   ...c,
   score:scoreCandidate(t,c.artist,c.name,c.mixHint||'')
