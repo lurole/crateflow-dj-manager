@@ -20,7 +20,7 @@ async function runOnTrack(tabId,expectedId,expectedTitle){
   const label=el=>[el.getAttribute('aria-label'),el.getAttribute('title'),el.textContent].filter(Boolean).join(' ').toLowerCase().replace(/\s+/g,' ').trim();
   const path=new URL(location.href).pathname;
   if(!new RegExp('^/(?:[a-z]{2}/)?track/[^/]+/'+id+'/?$').test(path))return {status:'failed',reason:'Track URL changed'};
-  const normalize=x=>String(x||'').toLowerCase().replace(/[^a-z0-9 ]/g,' ').split(/\\s+/).filter(w=>w.length>2);
+  const normalize=x=>String(x||'').toLowerCase().replace(/[^a-z0-9 ]/g,' ').split(/\s+/).filter(w=>w.length>2);
   const words=normalize(title),pageHeading=(document.querySelector('h1')?.textContent||document.title||'');
   const pageWords=new Set(normalize(pageHeading));
   if(words.length>=2&&words.filter(word=>pageWords.has(word)).length/words.length<0.55)return {status:'failed',reason:'Beatport track title mismatch'};
