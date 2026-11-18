@@ -102,7 +102,7 @@ async function exportToBeatportPlaylist(mode='playlist',specificId=null,name='')
  const title=String(name||(mode==='cart'?'CRATEFLOW Cart Handoff ':'CRATEFLOW ')+new Date().toISOString().slice(0,10)).trim().slice(0,75);
  if(!title)return toast('Please enter a playlist title');
  const fingerprint=unique.map(t=>String(t.studioCandidate.externalId)).sort().join(',');
- const existing=studioExportResult?.fingerprint===fingerprint?studioExportResult:null;
+ const existing=mode==='cart'&&studioExportResult?.fingerprint===fingerprint?studioExportResult:null;
  if(existing){
   studioExportResult={...existing,mode};
   studioModal='';studioCartTarget=null;studioInfoOpen=true;
