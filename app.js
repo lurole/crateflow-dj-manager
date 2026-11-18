@@ -54,7 +54,7 @@ function applyCatalogCandidate(t,index=0){
  persist();render();toast('Match approved; Beatport cart not changed');
 }
 // One-screen import and matching. Catalog scores are estimates, not guarantees.
-let studioRunning=false,studioExporting=false,studioProgress={done:0,total:0},studioError='',studioInput='',studioExportResult=null,studioShowAll=false,studioModal='',studioPlaylistName='',studioInfoOpen=false,studioCartTarget=null;
+let studioRunning=false,studioExporting=false,studioProgress={done:0,total:0},studioError='',studioInput='',studioExportResult=null,studioShowAll=false,studioModal='',studioPlaylistName='',studioInfoOpen=false;
 function bestExactCandidate(t, candidates){
   const exact=candidates.filter(c=>c.score===100);
   if(!exact.length)return null;
