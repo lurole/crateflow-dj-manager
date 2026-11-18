@@ -66,22 +66,26 @@ function bestExactCandidate(t, candidates){
   })[0];
 }
 function autoSelectExact(t,candidates){
-  const best=bestExactCandidate(t,candidates);
-  if(!best){t.studioResult='review';t.studioCandidate=null;return}
-  t.studioCandidate={...best};
-  // A metadata match without a confirmed Beatport URL is NOT a cart-ready match.
-  if(best.url){
-    t.match={url:best.url,title:best.name,artist:best.artist,mix:best.mixHint,score:best.score,source:'musicapi',confirmedAt:Date.now()};
-    t.studioResult='exact';
-    logSync(t,'Exact metadata match','100% heuristic, track URL available; cart not changed');
-  }else{
-    t.studioResult='missing_url';
-    logSync(t,'Metadata match','100% heuristic, Beatport track URL unavailable; cart not changed');
-  }
+ const best=bestExactCandidate(t,candidates);
+ if(!best){t.studioResult='review';t.studioCandidate=null;return}
+ t.studioCandidate={...best};
+ if(best.url){
+   t.match={url:best.url,title:best.name,artist:best.artist,mix:best.mixHint,score:best.score,source:'musicapi',confirmedAt:Date.now()};
+   t.studioResult='exact';
+   logSync(t,'Exact metadata match','100% local heuristic, provider URL available; no cart update');
+ }else if(best.externalId){
+   // MusicAPI playlist transfers use service track IDs; a shop URL is not required.
+   // Never fabricate an unverified Beatport URL or claim checkout cart success.
+   t.studioResult='id_ready';
+   logSync(t,'Matched by ID','100% local heuristic, Beatport ID available; URL missing; playlist eligible');
+ }else{
+   t.studioResult='missing_url';
+   logSync(t,'Metadata match','100% local heuristic, no Beatport ID or URL; cannot transfer');
+ }
 }
 async function exportToBeatportPlaylist(){
  if(studioExporting||studioRunning)return;
- const ready=state.tracks.filter(t=>['exact','manual'].includes(t.studioResult)&&t.studioCandidate?.externalId&&t.status==='pending');
+ const ready=state.tracks.filter(t=>['exact','manual','id_ready'].includes(t.studioResult)&&t.studioCandidate?.externalId&&t.status==='pending');
  const unique=[...new Map(ready.map(t=>[String(t.studioCandidate.externalId),t])).values()].slice(0,20);
  if(!unique.length)return toast('No matched tracks with Beatport IDs yet');
  if(sessionStorage.getItem('beatport_server_verified')!=='yes')return toast('Connect Beatport first');
@@ -101,15 +105,15 @@ function studioView(){
  const spotify=!!sessionStorage.getItem('spotify_access');
  const beatport=sessionStorage.getItem('beatport_server_verified')==='yes';
  const tracks=state.tracks.filter(t=>!['owned','downloaded'].includes(t.status));
- const selected=tracks.filter(t=>['exact','manual'].includes(t.studioResult)&&t.studioCandidate?.externalId);
- const exact=tracks.filter(t=>t.studioResult==='exact').length;
+ const selected=tracks.filter(t=>['exact','manual','id_ready'].includes(t.studioResult)&&t.studioCandidate?.externalId);
+ const exact=tracks.filter(t=>t.studioResult==='exact'||t.studioResult==='id_ready').length;
  const review=tracks.filter(t=>['review','error','missing_url'].includes(t.studioResult)).length;
  const remaining=tracks.filter(t=>!t.studioResult).length;
  const percent=studioProgress.total?Math.round(studioProgress.done/studioProgress.total*100):0;
  const list=studioShowAll?tracks:tracks.slice(0,30);
  const row=t=>{
    const result=t.studioResult||'pending',c=t.studioCandidate;
-   const status=result==='exact'?'100% match':result==='manual'?'Reviewed '+(t.match?.score??'')+'%':result==='missing_url'?'Link missing':result==='review'?'Review':result==='error'?'Error': 'Not searched';
+   const status=result==='exact'?'100% match':result==='id_ready'?'100% · ID ready':result==='manual'?'Reviewed '+(t.match?.score??'')+'%':result==='missing_url'?'Link missing':result==='review'?'Review':result==='error'?'Error': 'Not searched';
    const candidates=t.catalog?.candidates||[];
    const options=result==='review'?'<div class="compact-options">'+candidates.slice(0,4).map((m,i)=>'<div class="compact-option"><span>'+esc(m.name)+' <small>'+esc(m.artist)+' · '+m.score+'%</small></span><button class="btn" data-act="studioChoose" data-id="'+t.id+'" data-index="'+i+'" '+(!m.url?'disabled':'')+'>SELECT</button></div>').join('')+'</div>':'';
    return '<div class="compact-track">'+
