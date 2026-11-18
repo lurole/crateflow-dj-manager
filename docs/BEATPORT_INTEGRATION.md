@@ -26,3 +26,12 @@ The web app can import Spotify track metadata, open Beatport searches, save revi
 
 ## Next action
 Request official partner/API authorization from Beatport or written documentation from MusicAPI confirming whether cart additions are available for connected Beatport accounts. Do not implement password collection, undocumented Beatport endpoints, or unsupported claims of successful cart sync.
+
+## Callback verification implementation (phase 1.5)
+The serverless endpoint `POST /api/verify-beatport` verifies `authModelUUID` against MusicAPI's documented `GET /public/integrations/auth/{authModelUUID}` with server-side HTTP Basic auth, checks the returned user UUID, and only labels Beatport fully verified when the provider identifies the service as Beatport.
+
+The API endpoint is **disabled by default**. To allow an explicit verification attempt after reviewing MusicAPI pricing, set `MUSICAPI_ENABLE_VERIFICATION=true` on Vercel Production and redeploy. **Do not set this without affirmative cost approval.** The frontend exposes a Verify Beatport Login button but cannot verify while disabled. No subscription, checkout, or catalog sync is enabled.
+
+MusicAPI states that `data64` is not signed: never rely on callback status alone. API credentials are read from Vercel environment variables, never bundled into JavaScript. The callback identifiers are transient session data, not proof of the specific app user's identity.
+
+This is a single-user prototype: no first-party sign-in, server-side session binding, encrypted durable database, or rate limiter has been implemented. Do not deploy this as a multi-user public connected-account platform. For production add first-party user authentication, a secure state-bound session, ownership validation, endpoint rate limiting, and safe persistent user-connection storage.
