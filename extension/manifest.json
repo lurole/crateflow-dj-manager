@@ -1,19 +1,19 @@
 {
   "manifest_version": 3,
   "name": "CRATEFLOW · Beatport Cart Companion",
-  "version": "0.1.0",
-  "description": "User-initiated Buy All action on an open Beatport playlist. Does not purchase music.",
+  "version": "0.2.0",
+  "description": "Direct Beatport cart transfer from CRATEFLOW. Uses the signed-in user's browser session; no playlists or checkout.",
   "permissions": [
-    "activeTab",
-    "scripting",
-    "storage"
+    "storage",
+    "tabs",
+    "scripting"
   ],
   "host_permissions": [
     "https://www.beatport.com/*",
     "https://beatport.com/*"
   ],
   "action": {
-    "default_title": "CRATEFLOW Cart Companion",
+    "default_title": "CRATEFLOW Direct Cart Sync",
     "default_popup": "popup.html"
   },
   "browser_specific_settings": {
@@ -31,16 +31,9 @@
         "crateflow-bridge.js"
       ],
       "run_at": "document_idle"
-    },
-    {
-      "matches": [
-        "https://www.beatport.com/*",
-        "https://beatport.com/*"
-      ],
-      "js": [
-        "beatport-assistant.js"
-      ],
-      "run_at": "document_idle"
     }
-  ]
+  ],
+  "background": {
+    "service_worker": "direct-cart-background.js"
+  }
 }
