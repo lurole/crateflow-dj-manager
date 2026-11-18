@@ -11,3 +11,21 @@
 textarea.field{display:block;resize:vertical;min-height:110px}
 @media(max-width:1100px){.match-fields{grid-template-columns:1fr 1fr}}
 @media(max-width:650px){.match-fields{grid-template-columns:1fr}}
+
+/* v0.3 onboarding and advanced configuration */
+.onboard-top{display:flex;justify-content:space-between;align-items:center;gap:16px;margin:28px 0 15px}
+.onboard-top h2{font-size:25px;margin:10px 0 0}
+.onboard-top p{max-width:630px;margin:6px 0 0}
+.onboard-card{display:flex;align-items:flex-start;gap:23px;background:#151b1d;border:1px solid #303b3b;padding:25px;margin:13px 0;border-radius:14px}
+.onboard-icon{min-width:53px;height:53px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:#27372d;color:#c9f27b;font:700 19px 'Space Grotesk'}
+.onboard-copy{flex:1;min-width:0}
+.onboard-copy h2{margin:0;font-size:21px}
+.onboard-copy p{margin:8px 0 18px}
+.onboard-next{margin-top:25px;padding:26px;background:linear-gradient(120deg,#243728,#172020);border:1px solid #40523b;border-radius:14px;display:flex;align-items:center;justify-content:space-between;gap:20px}
+.onboard-next h2{margin:0}
+.onboard-next p{margin:6px 0}
+.advanced{border-top:1px solid #303839;margin-top:22px;padding-top:20px}
+.advanced summary{font-weight:700;color:#bac7bf;cursor:pointer;font-size:13px}
+.advanced-inside{padding-top:24px}
+.advanced-inside h2{margin-top:24px}
+@media(max-width:740px){.onboard-top,.onboard-next{align-items:flex-start;flex-direction:column}.onboard-card{padding:18px;gap:14px}.onboard-icon{min-width:40px;height:40px;font-size:15px}.onboard-copy h2{font-size:18px}.onboard-copy .row{align-items:flex-start}}
