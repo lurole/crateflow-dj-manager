@@ -114,3 +114,35 @@ textarea.field{display:block;resize:vertical;min-height:110px}
 .compact-header>.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 #studioCart,#studioExport{white-space:normal;text-align:center}
 @media(max-width:700px){.compact-header>.row{width:100%}.compact-header>.row .btn{flex:1;min-width:145px}}
+
+/* CRATEFLOW: compact track selection and Beatport transfer dialogs */
+.compact-col-head,.compact-track{grid-template-columns:34px minmax(0,1fr) 140px 76px;gap:14px}
+.compact-col-head>span:first-child{display:block}
+.compact-check{appearance:none;-webkit-appearance:none;background:#151d20;border:1px solid #6d7b7b;border-radius:6px;width:19px;height:19px;display:block;cursor:pointer;position:relative;opacity:1}
+.compact-check:checked{background:#d0f76c;border-color:#d0f76c}
+.compact-check:checked:after{content:"✓";position:absolute;inset:-2px 0 0;text-align:center;color:#101911;font-size:15px;font-weight:800}
+.compact-cart{font-size:18px!important;min-width:44px;min-height:38px;line-height:1;display:inline-flex;align-items:center;justify-content:center}
+.compact-cart:disabled{opacity:.38;cursor:not-allowed}
+.studio-select-all{margin:8px 0 16px}
+.compact-options{grid-column:2/5}
+.studio-transfer{padding-bottom:20px}
+.studio-info-btn{color:#d0f76c;border:1px solid #b0da63;background:#19251c}
+.studio-overlay{position:fixed;inset:0;z-index:1000;background:rgba(5,8,9,.76);display:flex;align-items:center;justify-content:center;padding:20px}
+.studio-dialog{width:min(100%,525px);background:#1b2225;border:1px solid #657473;border-radius:18px;box-shadow:0 24px 80px rgba(0,0,0,.6);padding:34px 36px;position:relative}
+.studio-dialog h2{font-size:25px;margin:0 30px 26px 0}
+.studio-dialog label{display:block;margin-bottom:10px}
+.studio-dialog .field{width:100%;box-sizing:border-box}
+.studio-dialog-actions{justify-content:flex-end;margin-top:28px}
+.studio-close{position:absolute;right:25px;top:18px;border:0;background:transparent;color:#bdc8c6;font-size:30px;cursor:pointer;line-height:1}
+.studio-dialog p{margin:0;color:#bdc8c6;line-height:1.7}
+@media(max-width:690px){
+ .compact-track{grid-template-columns:24px minmax(0,1fr) 48px;gap:9px}
+ .compact-check{grid-column:1;grid-row:1/3}
+ .compact-name{grid-column:2;grid-row:1}
+ .compact-status{grid-column:2;grid-row:2}
+ .compact-action{grid-column:3;grid-row:1/3}
+ .compact-options{grid-column:2/4}
+ .studio-dialog{padding:24px}
+ .studio-dialog-actions{flex-wrap:wrap}
+ .studio-dialog-actions .btn{flex:1}
+}
