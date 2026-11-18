@@ -12,14 +12,18 @@ async function waitTab(tabId,timeout=25000){
   api.tabs.get(tabId).then(tab=>{if(tab?.status==='complete'){clearTimeout(timer);api.tabs.onUpdated.removeListener(listener);resolve()}}).catch(()=>{});
  });
 }
-async function runOnTrack(tabId,expectedId){
- const output=await api.scripting.executeScript({target:{tabId},func:async id=>{
+async function runOnTrack(tabId,expectedId,expectedTitle){
+ const output=await api.scripting.executeScript({target:{tabId},func:async (id,title)=>{
   const pause=ms=>new Promise(r=>setTimeout(r,ms));
   const visible=el=>{if(!el||!el.isConnected||el.disabled||el.getAttribute('aria-disabled')==='true')return false;const r=el.getBoundingClientRect(),s=getComputedStyle(el);return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none'};
   const getButtons=()=>[...document.querySelectorAll('button,[role="button"]')].filter(visible);
   const label=el=>[el.getAttribute('aria-label'),el.getAttribute('title'),el.textContent].filter(Boolean).join(' ').toLowerCase().replace(/\s+/g,' ').trim();
   const path=new URL(location.href).pathname;
   if(!new RegExp('^/(?:[a-z]{2}/)?track/[^/]+/'+id+'/?$').test(path))return {status:'failed',reason:'Track URL changed'};
+  const normalize=x=>String(x||'').toLowerCase().replace(/[^a-z0-9 ]/g,' ').split(/\\s+/).filter(w=>w.length>2);
+  const words=normalize(title),pageHeading=(document.querySelector('h1')?.textContent||document.title||'');
+  const pageWords=new Set(normalize(pageHeading));
+  if(words.length>=2&&words.filter(word=>pageWords.has(word)).length/words.length<0.55)return {status:'failed',reason:'Beatport track title mismatch'};
   const matchBuy=el=>/\b(add to cart|add track to cart|buy track|buy now)\b/i.test(label(el))&&!/remove|buy all|checkout|wishlist/i.test(label(el));
   const matchInCart=el=>/\b(remove from cart|in cart|already in cart)\b/i.test(label(el));
   let button=null;
@@ -37,7 +41,7 @@ async function runOnTrack(tabId,expectedId){
   // Do not claim server-side cart confirmation based on DOM change alone.
   const indicators=[...document.querySelectorAll('[role="status"],[role="alert"],[aria-live]')].filter(visible).map(el=>el.textContent||'').join(' ').toLowerCase();
   return {status:'clicked_unverified',observed:/(added to cart|in your cart|added to your cart)/i.test(indicators)};
- },args:[expectedId]});
+ },args:[expectedId,expectedTitle]});
  return output?.[0]?.result||{status:'failed',reason:'No Beatport result'};
 }
 async function processQueue(){
@@ -56,7 +60,7 @@ async function processQueue(){
     if(u.protocol!=='https:'||!['www.beatport.com','beatport.com'].includes(u.hostname)||!new RegExp('^/(?:[a-z]{2}/)?track/[^/]+/'+item.trackId+'/?$').test(u.pathname))throw new Error('Invalid track page');
     tab=await api.tabs.create({url:item.url,active:false});
     await waitTab(tab.id);
-    result=await runOnTrack(tab.id,item.trackId);
+    result=await runOnTrack(tab.id,item.trackId,item.title);
    }catch(error){result={status:'failed',reason:String(error?.message||'Browser error').slice(0,120)}}
    if(tab&&result.status!=='failed'){try{await api.tabs.remove(tab.id)}catch{}}
    job.results.push({id:item.id,status:result.status,reason:result.reason||''});
