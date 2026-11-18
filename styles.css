@@ -116,7 +116,7 @@ textarea.field{display:block;resize:vertical;min-height:110px}
 @media(max-width:700px){.compact-header>.row{width:100%}.compact-header>.row .btn{flex:1;min-width:145px}}
 
 /* CRATEFLOW: compact track selection and Beatport transfer dialogs */
-.compact-col-head,.compact-track{grid-template-columns:34px minmax(0,1fr) 140px 76px;gap:14px}
+.compact-col-head,.compact-track{grid-template-columns:34px minmax(0,1fr) 150px;gap:14px}
 .compact-col-head>span:first-child{display:block}
 .compact-check{appearance:none;-webkit-appearance:none;background:#151d20;border:1px solid #6d7b7b;border-radius:6px;width:19px;height:19px;display:block;cursor:pointer;position:relative;opacity:1}
 .compact-check:checked{background:#d0f76c;border-color:#d0f76c}
@@ -124,7 +124,7 @@ textarea.field{display:block;resize:vertical;min-height:110px}
 .compact-cart{font-size:18px!important;min-width:44px;min-height:38px;line-height:1;display:inline-flex;align-items:center;justify-content:center}
 .compact-cart:disabled{opacity:.38;cursor:not-allowed}
 .studio-select-all{margin:8px 0 16px}
-.compact-options{grid-column:2/5}
+.compact-options{grid-column:2/4}
 .studio-transfer{padding-bottom:20px}
 .studio-info-btn{color:#d0f76c;border:1px solid #b0da63;background:#19251c}
 .studio-overlay{position:fixed;inset:0;z-index:1000;background:rgba(5,8,9,.76);display:flex;align-items:center;justify-content:center;padding:20px}
@@ -136,12 +136,11 @@ textarea.field{display:block;resize:vertical;min-height:110px}
 .studio-close{position:absolute;right:25px;top:18px;border:0;background:transparent;color:#bdc8c6;font-size:30px;cursor:pointer;line-height:1}
 .studio-dialog p{margin:0;color:#bdc8c6;line-height:1.7}
 @media(max-width:690px){
- .compact-track{grid-template-columns:24px minmax(0,1fr) 48px;gap:9px}
+ .compact-track{grid-template-columns:24px minmax(0,1fr);gap:9px}
  .compact-check{grid-column:1;grid-row:1/3}
  .compact-name{grid-column:2;grid-row:1}
  .compact-status{grid-column:2;grid-row:2}
- .compact-action{grid-column:3;grid-row:1/3}
- .compact-options{grid-column:2/4}
+ .compact-options{grid-column:2/3}
  .studio-dialog{padding:24px}
  .studio-dialog-actions{flex-wrap:wrap}
  .studio-dialog-actions .btn{flex:1}
