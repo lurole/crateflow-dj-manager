@@ -116,7 +116,7 @@ function studioView(){
  (studioError?'<p class="studio-error">'+esc(studioError)+'</p>':'')+
  '<div class="studio-metrics"><div><strong>'+exact+'</strong><small>Selected with link</small></div><div><strong>'+missing+'</strong><small>100%, link missing</small></div><div><strong>'+review+'</strong><small>Review needed</small></div><div><strong>'+untouched+'</strong><small>Not searched</small></div></div>'+
  '<div class="studio-export"><div><div class="eyebrow">03 · BEATPORT HANDOFF</div><h2>Send to Beatport</h2><p>Build a Beatport playlist from matched tracks, then use Beatport’s own Add to Cart / Buy All action. Purchases stay on Beatport.</p></div><button class="btn primary" id="studioExport" '+(studioRunning||studioExporting?'disabled':'')+'>'+(studioExporting?'EXPORTING…':'CREATE BEATPORT PLAYLIST')+'</button></div>'+
- (studioExportResult?'<div class="studio-export-success"><strong>'+studioExportResult.added+' tracks added to Beatport playlist</strong><span>Open your playlists in Beatport and choose Add to Cart. The real cart has NOT been updated by CRATEFLOW.</span><a href="https://www.beatport.com/my-beatport/playlists" target="_blank" rel="noopener noreferrer">OPEN BEATPORT PLAYLISTS ↗</a></div>':'')+
+ (studioExportResult?'<div class="studio-export-success"><strong>'+studioExportResult.added+' tracks added to Beatport playlist</strong><span>Open your playlists in Beatport and choose Add to Cart. The real cart has NOT been updated by CRATEFLOW.</span><a href="https://www.beatport.com/" target="_blank" rel="noopener noreferrer">OPEN BEATPORT ↗</a></div>':'')+
  '<div class="studio-results">'+(tracks.length?tracks.map(t=>{
  const result=t.studioResult||'pending';
  const c=t.studioCandidate;
