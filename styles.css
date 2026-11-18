@@ -29,3 +29,11 @@ textarea.field{display:block;resize:vertical;min-height:110px}
 .advanced-inside{padding-top:24px}
 .advanced-inside h2{margin-top:24px}
 @media(max-width:740px){.onboard-top,.onboard-next{align-items:flex-start;flex-direction:column}.onboard-card{padding:18px;gap:14px}.onboard-icon{min-width:40px;height:40px;font-size:15px}.onboard-copy h2{font-size:18px}.onboard-copy .row{align-items:flex-start}}
+
+/* MusicAPI catalog matching */
+.catalog-result{margin-top:14px}
+.catalog-candidate{padding:16px;margin:10px 0 12px;border:1px solid #43523b;background:#1d2922;border-radius:10px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.catalog-candidate strong{color:#e5f2d6}
+.catalog-candidate p{margin:6px 0 0}
+.catalog-candidate .row{flex-shrink:0}
+@media(max-width:740px){.catalog-candidate{flex-direction:column;align-items:stretch}.catalog-candidate .row{flex-shrink:1}}
