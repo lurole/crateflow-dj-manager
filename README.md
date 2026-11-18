@@ -58,3 +58,11 @@ IMPORTANT: MusicAPI's playlist write does **not** update Beatport's checkout car
 Beatport confirms that its DJ App has a playlist-level Add to Cart function with a 100-track cart limit: https://support.beatport.com/hc/en-us/articles/30542592676500-Can-I-purchase-tracks-using-the-DJ-App . The MusicAPI playlist endpoints are documented at https://musicapi.com/docs/endpoints/create-playlist and https://musicapi.com/docs/endpoints/add-items-to-playlist .
 
 This remains a single-browser beta and is **not** ready for multi-user production writes until authenticated per-user sessions, distributed quotas, a durable export ledger, CSRF token management, and provider permission checks are implemented.
+
+## Track list UI (v0.8)
+- Track rows contain default-selected checkboxes, a select/deselect-all control, match status, and a cart icon. Selection persists in browser-local state.
+- Review candidates show only the top-ranked MusicAPI candidate; the user must explicitly approve uncertain matches.
+- **Add Playlist in Beatport** opens an in-app title dialog; the chosen title is sent through the existing MusicAPI playlist creation API.
+- **Send to Cart in Beatport** and per-track cart icons open an explanatory handoff dialog. The provider has no verified direct cart-write API, so confirmation only transfers selected matched tracks to a Beatport playlist. The user must use **Buy All** on Beatport to add them to the actual cart. No false cart-success state is shown.
+- The transfer-status panel appears only after the MusicAPI playlist API returned success. A status button reveals details.
+- Up to 20 unique Beatport IDs per playlist transfer (provider calls must be covered by evaluation/billing limitations).
