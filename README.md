@@ -1,5 +1,20 @@
 # CRATEFLOW — DJ Music Manager
 
+## Beatport Matching — current implementation
+
+**Current workflow:** Import Spotify tracks/playlists, connect Beatport via MusicAPI, and use **IMPORT & MATCH** or **MATCH NEXT 10** in the workspace. Each search is explicitly user-initiated (or follows an explicit import action). MusicAPI requests may consume account quota.
+
+**Version-aware matching (2026-11):** `matching.js` compares normalized track titles, complete artist strings, explicit Original/Extended/Radio/Club/Dub/Live/Edit mix labels, and named remixers. When both sources provide ISRC, conflicts prevent automatic selection. The optional **Prefer Extended Mix** setting ranks Extended Mixes ahead of Original Mixes when the source track does not specify a version.
+
+CRATEFLOW **automatically selects only a unique, unambiguous candidate with a MusicAPI playlist track ID** and matching title, artist and version. Conflicting remixes, uncertain metadata, duplicate catalog releases, missing IDs and differing ISRC values require review. Up to four candidates display their mix version, metadata-similarity percentage and reason for review. Users can select a candidate, retry the search or change a selection. Heuristic percentages **do not guarantee** that a Beatport release is identical to a Spotify recording.
+
+Existing cached automatic matches are re-evaluated when the application opens or mix preference changes; any previously overconfident unexported match is moved back to review. Already manually approved matches and previously exported playlists are not retroactively altered.
+
+**Run regression tests:** `npm test` (Node 18+; no extra dependencies). The suite covers wrong versions, named remixes, ambiguous releases and ISRC mismatches. No live MusicAPI credentials are necessary for these unit tests.
+
+The actual connected-account MusicAPI lookup returns sanitized candidate metadata. The API request is still rate-limited and cost-gated by server configuration. Live provider response coverage and real end-to-end playlist export require testing against an authorized Beatport connection; these tests are **not** simulated by the unit suite.
+
+
 Browser-based DJ music management prototype. Live Spotify playlist metadata import via OAuth PKCE, CSV import, local music library, Beatport search queue, purchase/download status tracking, and Rekordbox XML export.
 
 ## Deployment
