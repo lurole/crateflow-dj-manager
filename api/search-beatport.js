@@ -48,15 +48,36 @@ export default async function handler(req,res){
       const reason=response.status===412?'Beatport session needs reconnecting':response.status===418?'Beatport account search not supported':response.status===401||response.status===403?'MusicAPI account search not authorized':response.status===429?'MusicAPI rate limit reached':'Beatport account search failed';
       return res.status(502).json({ok:false,error:reason,providerStatus:response.status,providerCode:code});
     }
-    const raw=Array.isArray(data?.tracks)?data.tracks:Array.isArray(data?.items)?data.items:Array.isArray(data)?data:[];
-    const candidates=raw.slice(0,6).map(item=>{
-      const d=item?.data||item;
-      const artistNames=Array.isArray(d?.artistNames)?d.artistNames:Array.isArray(d?.artists)?d.artists.map(a=>typeof a==='string'?a:a?.name):[];
-      const name=String(d?.name||d?.title||'').slice(0,220);
-      const url=String(d?.url||d?.externalUrl||'');
-      return {name,artist:artistNames.join(', ').slice(0,250),url:/^https:\/\/(www\.)?beatport\.com\/track\//.test(url)?url:null,externalId:String(d?.externalId||d?.id||'').slice(0,80),isrc:String(d?.isrc||'').slice(0,40),mixHint:/extended/i.test(name)?'Extended Mix':/radio/i.test(name)?'Radio Edit':/original/i.test(name)?'Original Mix':'Unspecified'};
+    // The connected-user API is separate from public catalog search.
+    // Never interpret an unrecognized 200 payload as a genuine catalog miss.
+    const envelope=Array.isArray(data)?data:
+      Array.isArray(data?.tracks)?data.tracks:
+      Array.isArray(data?.items)?data.items:
+      Array.isArray(data?.results)?data.results:
+      Array.isArray(data?.data?.tracks)?data.data.tracks:
+      Array.isArray(data?.data?.items)?data.data.items:
+      Array.isArray(data?.data?.results)?data.data.results:
+      null;
+    const declaredEmpty=data?.status==='not_found'||data?.status==='notFound'||data?.status==='empty'||data?.found===false;
+    if(!envelope&&!declaredEmpty){
+      const responseFields=data&&typeof data==='object'?Object.keys(data).filter(k=>/^[a-zA-Z][a-zA-Z0-9_]{0,39}$/.test(k)).slice(0,12):[];
+      return res.status(502).json({ok:false,error:'Unexpected MusicAPI search response. The track has not been classified as not found.',diagnostic:'unrecognized_response',responseFields});
+    }
+    const raw=envelope||[];
+    const candidates=raw.slice(0,8).map(item=>{
+      const d=item?.data||item?.track||item;
+      const artists=Array.isArray(d?.artistNames)?d.artistNames:
+        Array.isArray(d?.artists)?d.artists.map(a=>typeof a==='string'?a:a?.name):
+        typeof d?.artist==='string'?[d.artist]:[];
+      const name=String(d?.name||d?.title||d?.trackName||'').slice(0,220);
+      const url=String(d?.url||d?.externalUrl||d?.shareUrl||'');
+      return {name,artist:artists.filter(Boolean).join(', ').slice(0,250),url:/^https:\/\/(www\.)?beatport\.com\/track\//.test(url)?url:null,externalId:String(d?.externalId||d?.id||'').slice(0,80),isrc:String(d?.isrc||'').slice(0,40),mixHint:/extended/i.test(name)?'Extended Mix':/radio/i.test(name)?'Radio Edit':/original/i.test(name)?'Original Mix':'Unspecified'};
     }).filter(c=>c.name);
+    if(raw.length>0&&!candidates.length){
+      return res.status(502).json({ok:false,error:'MusicAPI returned records, but CRATEFLOW could not read their track fields.',diagnostic:'unrecognized_tracks',recordCount:raw.length});
+    }
     return res.status(200).json({ok:true,status:candidates.length?'success':'not_found',candidates});
+
   }catch{return res.status(502).json({ok:false,error:'Beatport search timed out or failed'});}
   finally{clearTimeout(timeout);}
 }
