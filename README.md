@@ -66,3 +66,16 @@ This remains a single-browser beta and is **not** ready for multi-user productio
 - **Send to Cart in Beatport** and per-track cart icons open an explanatory handoff dialog. The provider has no verified direct cart-write API, so confirmation only transfers selected matched tracks to a Beatport playlist. The user must use **Buy All** on Beatport to add them to the actual cart. No false cart-success state is shown.
 - The transfer-status panel appears only after the MusicAPI playlist API returned success. A status button reveals details.
 - Up to 20 unique Beatport IDs per playlist transfer (provider calls must be covered by evaluation/billing limitations).
+
+## Direct Beatport Cart (v0.9 — developer beta, not live verified)
+
+The **Send to Cart in Beatport** button and each track's cart icon are now wired to a **direct cart job**, not to the playlist API.
+
+- The optional CRATEFLOW Cart Companion queues 1–20 selected Beatport track IDs and uses the signed-in Beatport browser session to open track pages and attempt a uniquely identified **Add to Cart** button click.
+- The browser extension is required for direct cart actions until an authorized Beatport cart API exists. The web app never receives Beatport cookies/passwords.
+- The cart job reports **clicked_unverified**, **already_in_cart**, and **failed**. This is deliberately not a promise that Beatport accepted the cart change. A live test on Beatport is still required.
+- **Add Playlist in Beatport** continues to use MusicAPI's playlist endpoint and is completely separate.
+- The current Manifest V3 build targets Chromium browsers first; Firefox and Safari versions require compatibility and packaging work.
+- The developer installation/test procedure is in [extension/README.md](extension/README.md).
+
+Do not conflate direct cart jobs with the earlier playlist handoff prototype; that prototype has been removed from the active extension manifest.
