@@ -17,7 +17,7 @@ export default async function handler(req,res){
  if(parts[1].length!==signature.length||!crypto.timingSafeEqual(Buffer.from(parts[1]),Buffer.from(signature)))return res.status(401).json({ok:false,error:'Invalid Beatport session'});
  let session;try{session=JSON.parse(Buffer.from(parts[0],'base64url').toString('utf8'))}catch{return res.status(401).json({ok:false,error:'Invalid Beatport session'})}
  if(!UUID.test(session?.uid||'')||!Number.isInteger(session?.exp)||session.exp<Math.floor(Date.now()/1000))return res.status(401).json({ok:false,error:'Beatport connection expired; reconnect'});
- const payload=typeof req.body==='string'?JSON.parse(req.body||'{}'):req.body;
+ let payload;try{payload=typeof req.body==='string'?JSON.parse(req.body||'{}'):req.body}catch{return res.status(400).json({ok:false,error:'Invalid JSON request'})}
  const ids=payload?.trackIds, title=String(payload?.name||'CRATEFLOW Selection').trim().slice(0,75);
  if(!Array.isArray(ids)||ids.length<1||ids.length>20||!title)return res.status(400).json({ok:false,error:'Choose 1 to 20 confirmed tracks'});
  if(!ids.every(x=>typeof x==='string'&&/^[A-Za-z0-9_-]{1,80}$/.test(x)))return res.status(400).json({ok:false,error:'Invalid Beatport track identifiers'});
