@@ -24,3 +24,10 @@ Open **Match & Sync** in the left sidebar. For each imported track:
 A local activity history records searches, confirmed matches, and cart acknowledgements. It can be exported as JSON. The **Prefer Extended Mix** setting influences search wording and candidate score. This phase does not scrape the Beatport catalog, log in to Beatport or add items to the Beatport cart automatically.
 
 Planned phase 2: user-controlled Chrome extension for supported Beatport storefront actions, after validating live DOM and allowed permissions. Never treat local cart status as real-time confirmation of a remote cart.
+
+## First-time onboarding (v0.3)
+New browser users are shown **Get Started**, a simplified Spotify and Beatport connection screen, with direct progression to **Import Music**. Advanced developer settings (Spotify Client ID, MusicAPI account slug) are inside a collapsible advanced section, not part of the primary user journey. The shared MusicAPI account slug is initialized to the application's developer slug; users do **not** need MusicAPI accounts or keys.
+
+Beatport login is initiated by a hosted MusicAPI page, and the optional verification API remains cost-gated using `MUSICAPI_ENABLE_VERIFICATION`. This beta only stores a session-level verified indicator and does not support real multi-user accounts, durable OAuth connections, cloud sync, or automatic Beatport cart mutations. Spotify API app development restrictions still apply.
+
+Before public launch: implement user authentication and secure session binding for MusicAPI auth attempts, durable per-user connections and catalog data, billing controls, and authorized Beatport cart access. Never store a MusicAPI secret or Beatport password in browser-accessible code.
