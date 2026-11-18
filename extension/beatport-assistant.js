@@ -25,6 +25,17 @@
   styleButton(cancel,false);
   cancel.addEventListener('click',async()=>{await api.storage.local.remove('crateflowCartJob');currentJob=null;dismiss()});
   row.append(cancel);
+  if(!isPlaylist){
+   const anchors=[...document.querySelectorAll('a[href]')].filter(visible).filter(a=>{
+    try{const url=new URL(a.href,location.href);return ['www.beatport.com','beatport.com'].includes(url.hostname)&&url.protocol==='https:'&&/playlist/i.test(url.pathname)&&norm(a.textContent)===norm(job.name)}
+    catch{return false}
+   });
+   if(anchors.length===1){
+    const open=document.createElement('button');open.textContent='Open playlist';styleButton(open,true);
+    open.addEventListener('click',()=>{location.assign(anchors[0].href)});
+    row.append(open);
+   }
+  }
   if(isPlaylist){
    const action=document.createElement('button');action.textContent='Confirm Buy All';styleButton(action,true);
    action.addEventListener('click',async()=>{
