@@ -37,3 +37,29 @@ textarea.field{display:block;resize:vertical;min-height:110px}
 .catalog-candidate p{margin:6px 0 0}
 .catalog-candidate .row{flex-shrink:0}
 @media(max-width:740px){.catalog-candidate{flex-direction:column;align-items:stretch}.catalog-candidate .row{flex-shrink:1}}
+
+/* One-screen importer and matching workflow */
+.studio-status{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:22px 0}
+.studio-status .pill{padding:9px 12px}
+.studio-main{margin:18px 0}
+.studio-main h2{font-size:22px}
+.studio-main textarea{margin:18px 0 8px;min-height:122px;line-height:1.65}
+.studio-toggle{display:flex;align-items:center;gap:9px;color:#cfdbd1;font-size:13px;margin:12px 0}
+.studio-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:22px 0}
+.studio-metrics>div{padding:15px;border:1px solid #303c39;border-radius:9px}
+.studio-metrics strong{display:block;font:600 27px 'Space Grotesk';color:#d2fb65}
+.studio-metrics small{color:#96a49b;font-size:11px}
+.studio-progress{height:7px;background:#303a38;border-radius:9px;margin:15px 0 5px;overflow:hidden}
+.studio-progress>div{height:100%;background:#d2fb65;transition:width .2s}
+.studio-track{border-top:1px solid #2c3635;padding:18px 0}
+.studio-track-main{display:flex;gap:14px;justify-content:space-between;align-items:center}
+.studio-track-main strong{font-size:14px}
+.studio-track-main p{margin:4px 0 10px}
+.studio-track .row{margin-top:7px}
+.studio-track .btn{padding:8px 11px;font-size:11px}
+.studio-selected{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px;margin:5px 0 12px;background:#1f2b22;border-radius:8px;color:#ddeadd;font-size:12px}
+.studio-selected a{color:#d2fb65;font-weight:700}
+.studio-selected span{color:#dfae7b}
+.studio-option{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-top:1px solid #2f3837;font-size:12px}
+.studio-error{color:#f0aaaa;font-size:12px}
+@media(max-width:700px){.studio-metrics{grid-template-columns:repeat(2,1fr)}.studio-track-main{align-items:flex-start}.studio-option{flex-wrap:wrap}}
