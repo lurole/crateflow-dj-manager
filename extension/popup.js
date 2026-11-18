@@ -10,8 +10,8 @@ button.addEventListener('click',async()=>{
     // Execute on explicit user click only. Avoid guessing undocumented endpoints.
     const results=await api.scripting.executeScript({target:{tabId:tab.id},func:()=>{
       const visible=el=>{const r=el.getBoundingClientRect(),s=getComputedStyle(el);return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none'&&!el.disabled};
-      const buttons=[...document.querySelectorAll('button,[role="button"]')].filter(visible).filter(el=>/^(buy all|add to cart|add all to cart)$/i.test((el.innerText||el.getAttribute('aria-label')||'').trim()));
-      if(buttons.length!==1)return {ok:false,message:buttons.length?'Multiple purchase buttons detected; open a single playlist detail page.':'No Buy All / Add to Cart button found. Open a playlist detail page, then retry.'};
+      const buttons=[...document.querySelectorAll('button,[role="button"]')].filter(visible).filter(el=>/^(buy all|add all to cart)$/i.test((el.innerText||el.getAttribute('aria-label')||'').trim()));
+      if(buttons.length!==1)return {ok:false,message:buttons.length?'Multiple purchase buttons detected; open a single playlist detail page.':'No playlist Buy All button found. Open a playlist detail page, then retry.'};
       const text=(document.querySelector('h1')?.textContent||'').trim();
       if(!window.confirm('Add the tracks from the open Beatport page'+(text?' (“'+text.slice(0,85)+'”)':'')+' to your cart?'))return {ok:false,message:'Cancelled'};
       buttons[0].click();
