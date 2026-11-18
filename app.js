@@ -62,7 +62,7 @@ const directCartUrl=t=>{
   const u=new URL(url);
   if(u.protocol==='https:'&&['www.beatport.com','beatport.com'].includes(u.hostname)&&/^\/(?:[a-z]{2}\/)?track\/[^/]+\/\d+\/?$/.test(u.pathname))return u.href;
  }catch{}
- const id=String(t.studioCandidate?.externalId||'');
+ const id=String(t.studioCandidate?.beatportId||t.studioCandidate?.externalId||'');
  if(/^\d{1,12}$/.test(id))return 'https://www.beatport.com/track/track/'+id;
  return '';
 };
@@ -98,12 +98,11 @@ function studioCartAction(trackId=null){
  if(!studioCompanionReady)return toast('Install and enable the CRATEFLOW Cart Companion in this browser to send tracks directly to cart.');
  const tracks=chosen.map(t=>{
   const url=directCartUrl(t);
-  const id=String(t.studioCandidate?.externalId||'');
   const parsed=url.match(/\/([0-9]{1,12})(?:\/)?$/);
   return {id:t.id,trackId:parsed?parsed[1]:'',url,title:String(t.title).slice(0,180),artist:String(t.artist).slice(0,180)};
  });
  const sendable=tracks.filter(t=>t.trackId&&t.url);
- if(!sendable.length)return toast('No verified Beatport track URLs or numeric IDs available for direct cart transfer.');
+ if(!sendable.length)return toast('No numeric Beatport track IDs are available for direct cart transfer. Try matching the tracks again.');
  if(sendable.length!==tracks.length)return toast('Some matches have no usable Beatport track ID. Direct cart not started; review the matches.');
  if(sendable.length>20)return toast('Select at most 20 tracks per cart transfer.');
  const nonce=Date.now().toString(36)+Math.random().toString(36).slice(2)+Math.random().toString(36).slice(2);
