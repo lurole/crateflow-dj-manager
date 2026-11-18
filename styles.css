@@ -97,3 +97,15 @@ textarea.field{display:block;resize:vertical;min-height:110px}
 .compact-name strong{white-space:normal}
 .compact-summary{gap:10px}
 }
+
+/* No checkboxes: every matched imported track enters Beatport handoff */
+.compact-col-head,.compact-track{grid-template-columns:minmax(0,1fr) 132px 118px}
+.compact-col-head>span:first-child{display:none}
+.compact-options{grid-column:1/4}
+@media(max-width:690px){
+ .compact-track{grid-template-columns:minmax(0,1fr) auto}
+ .compact-name{grid-column:1;grid-row:1}
+ .compact-status{grid-column:1;grid-row:2}
+ .compact-action{grid-column:2;grid-row:1/3}
+ .compact-options{grid-column:1/3}
+}
