@@ -37,17 +37,17 @@ async function spotifyGet(url){let r=await fetch(url,{headers:{Authorization:'Be
 
 function parsePaste(input){
   const entries=[],seen=new Set();
-  const re=/(?:https?:\\/\\/(?:open\\.)?spotify\\.com\\/(track|playlist)\\/|spotify:(track|playlist):)([A-Za-z0-9]{22})/ig;
-  for(const line of input.split(/\\r?\\n/)){
+  const re=/(?:https?:\/\/(?:open\.)?spotify\.com\/(track|playlist)\/|spotify:(track|playlist):)([A-Za-z0-9]{22})/ig;
+  for(const line of input.split(/\r?\n/)){
     const trimmed=line.trim();if(!trimmed)continue;
     const matches=[...trimmed.matchAll(re)];
     if(matches.length){for(const m of matches){const type=(m[1]||m[2]).toLowerCase(),id=m[3],k=type+':'+id;if(!seen.has(k)){entries.push({type,id});seen.add(k)}}continue}
-    if(/^(?:https?:\\/\\/|spotify:)/i.test(trimmed)) {entries.push({type:'unsupported',value:trimmed});continue}
-    const tabbed=trimmed.split('\\t').map(s=>s.trim()).filter(Boolean);
+    if(/^(?:https?:\/\/|spotify:)/i.test(trimmed)) {entries.push({type:'unsupported',value:trimmed});continue}
+    const tabbed=trimmed.split('\t').map(s=>s.trim()).filter(Boolean);
     let artist='',title='';
     if(tabbed.length>=2){title=tabbed[0];artist=tabbed[1]}
     else{
-      const sep=trimmed.match(/^(.+?)\\s+[–—-]\\s+(.+)$/);
+      const sep=trimmed.match(/^(.+?)\s+[–—-]\s+(.+)$/);
       if(sep){artist=sep[1].trim();title=sep[2].trim()}else title=trimmed;
     }
     if(title){const k='text:'+norm(artist+' '+title);if(!seen.has(k)){entries.push({type:'text',title,artist});seen.add(k)}}
