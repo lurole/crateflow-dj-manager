@@ -1,4 +1,4 @@
 import fs from 'node:fs';
 fs.mkdirSync('dist',{recursive:true});
-for (const file of ['index.html','styles.css','app.js']) fs.copyFileSync(file,'dist/'+file);
+for (const file of ['index.html','styles.css','landing-agentflow-v1.css','app.js']) fs.copyFileSync(file,'dist/'+file);
 console.log('CRATEFLOW static site built in dist/');
