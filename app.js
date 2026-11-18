@@ -6,7 +6,7 @@ let page=new URLSearchParams(location.search).get('app')==='1'?(localStorage.get
 const persist=()=>localStorage.setItem(storage,JSON.stringify(state)),uid=()=>crypto.randomUUID(),trackStats=()=>({total:state.tracks.length,pending:state.tracks.filter(t=>t.status==='pending').length,cart:state.tracks.filter(t=>t.status==='cart').length,owned:state.tracks.filter(t=>t.status==='owned').length,downloaded:state.tracks.filter(t=>t.status==='downloaded').length});
 function toast(s){let t=$('#toast');t.textContent=s;t.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove('show'),4000)}
 function norm(s){return String(s||'').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim()}
-function importTracks(rows,name){let p=state.playlists.find(p=>p.name===name);if(!p){p={id:uid(),name};state.playlists.push(p)}let count=0,dup=0;for(const row of rows){let title=String(row.title||'').trim(),artist=String(row.artist||'Unknown Artist').trim();if(!title)continue;if(state.tracks.some(t=>norm(t.title)===norm(title)&&norm(t.artist)===norm(artist))){dup++;continue}state.tracks.unshift({id:uid(),title,artist,remix:row.remix||'',album:row.album||'',genre:row.genre||'',bpm:row.bpm||'',key:row.key||'',filePath:row.filePath||'',status:row.status||'pending',playlistId:p.id,source:row.source||'manual',date:Date.now()});count++}persist();toast(count+' Tracks importiert'+(dup?' · '+dup+' Duplikate übersprungen':''));return count}
+function importTracks(rows,name){let p=state.playlists.find(p=>p.name===name);if(!p){p={id:uid(),name};state.playlists.push(p)}let count=0,dup=0;for(const row of rows){let title=String(row.title||'').trim(),artist=String(row.artist||'Unknown Artist').trim();if(!title)continue;if(state.tracks.some(t=>norm(t.title)===norm(title)&&norm(t.artist)===norm(artist))){dup++;continue}state.tracks.unshift({id:uid(),title,artist,remix:row.remix||'',album:row.album||'',genre:row.genre||'',bpm:row.bpm||'',key:row.key||'',filePath:row.filePath||'',status:row.status||'pending',isrc:row.isrc||'',playlistId:p.id,source:row.source||'manual',date:Date.now()});count++}persist();toast(count+' Tracks importiert'+(dup?' · '+dup+' Duplikate übersprungen':''));return count}
 const head=(eyebrow,title,desc)=>'<div class="eyebrow">'+eyebrow+'</div><h1>'+title+'</h1><p>'+desc+'</p>';
 const card=(label,num,extra)=>'<div class="card"><label>'+label+'</label><strong>'+num+'</strong><small>'+extra+'</small></div>';
 const action=(label,act,id)=>'<button class="btn" data-act="'+act+'" data-id="'+id+'">'+label+'</button>';
@@ -16,16 +16,15 @@ function table(tracks){return '<div class="table">'+(tracks.length?'<table><thea
 
 const storeSearch=t=>'https://www.beatport.com/search?q='+encodeURIComponent((t.artist||'')+' '+(t.title||'')+(state.settings.preferExtended?' extended mix':''));
 function logSync(t,action,details=''){state.syncHistory.unshift({id:uid(),trackId:t.id,title:t.title,artist:t.artist,action,details,time:Date.now()});state.syncHistory=state.syncHistory.slice(0,350);persist()}
-function scoreCandidate(t,artist,title,mix){let normal=x=>norm(String(x||'').replace(/\((original|extended|radio|club|edit|mix|remix)[^)]*\)/ig,''));const tokens=x=>new Set(normal(x).split(' ').filter(Boolean));const similarity=(a,b)=>{let A=tokens(a),B=tokens(b);return !A.size||!B.size?0:[...A].filter(x=>B.has(x)).length/Math.max(A.size,B.size)};let art=similarity(t.artist,artist),song=similarity(t.title,title),score=0.4*art+0.6*song;const ext=/extended/i.test(mix+' '+title),radio=/radio edit/i.test(mix+' '+title);if(state.settings.preferExtended){if(ext)score+=0.06;if(radio)score-=0.14}return Math.max(0,Math.min(100,Math.round(score*100)))}
+function scoreCandidate(t,artist,title,mix){
+ return globalThis.CrateflowMatching.assess(t,{artist,name:title,mixHint:mix},state.settings.preferExtended).score;
+}
 let catalogSearchBusy=false;
 async function searchCatalogTrack(t){
- const response=await fetch('/api/search-beatport',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({artist:t.artist,title:t.title})});
+ const response=await fetch('/api/search-beatport',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({artist:t.artist,title:t.remix&&!String(t.title).toLowerCase().includes(String(t.remix).toLowerCase())?t.title+' ('+t.remix+')':t.title})});
  const data=await response.json();
  if(!response.ok||!data.ok)throw Error((data.error||'Catalog lookup failed')+(data.providerStatus?' (MusicAPI HTTP '+data.providerStatus+(data.providerCode?', code '+data.providerCode:'')+')':'')+(data.diagnostic==='unrecognized_response'?' [response: '+(data.responseFields||[]).join(', ')+'; data: '+(data.dataFields||[]).join(', ')+'; result: '+(data.resultFields||[]).join(', ')+']':''));
- const candidates=(data.candidates||[]).map(c=>({
-  ...c,
-  score:scoreCandidate(t,c.artist,c.name,c.mixHint||'')
- }));
+ const candidates=globalThis.CrateflowMatching.rankCandidates(t,data.candidates||[],state.settings.preferExtended);
  t.catalog={status:data.status,candidates,checkedAt:Date.now()};
  logSync(t,'Catalog lookup',candidates.length?candidates.length+' result(s) received from MusicAPI':'No Beatport match returned');
  return candidates;
@@ -55,33 +54,25 @@ function applyCatalogCandidate(t,index=0){
 }
 // One-screen import and matching. Catalog scores are estimates, not guarantees.
 let studioRunning=false,studioExporting=false,studioProgress={done:0,total:0},studioError='',studioInput='',studioExportResult=null,studioShowAll=false,studioModal='',studioPlaylistName='',studioInfoOpen=false;
-function bestExactCandidate(t, candidates){
-  const exact=candidates.filter(c=>c.score===100);
-  if(!exact.length)return null;
-  // Prefer an explicitly requested mix; otherwise prefer extended mixes when configured.
-  const preferred=String(t.remix||'').trim().toLowerCase();
-  return [...exact].sort((a,b)=>{
-    const priority=c=>(preferred&&String(c.name).toLowerCase().includes(preferred)?100:0)+(state.settings.preferExtended&&/extended mix/i.test(c.name+' '+c.mixHint)?10:0)+(c.url?2:0);
-    return priority(b)-priority(a);
-  })[0];
+function bestExactCandidate(t,candidates){
+ return globalThis.CrateflowMatching.bestAutomatic(t,candidates,state.settings.preferExtended);
 }
 function autoSelectExact(t,candidates){
  const best=bestExactCandidate(t,candidates);
- if(!best){t.studioResult='review';t.studioCandidate=null;return}
+ if(!best){
+  t.studioResult='review';t.studioCandidate=null;
+  if(t.match?.source==='musicapi')delete t.match;
+  logSync(t,'Match needs review',candidates.length?'Multiple, incomplete or conflicting metadata candidates':'No Beatport candidate returned');
+  return;
+ }
  t.studioCandidate={...best};
  if(best.url){
-   t.match={url:best.url,title:best.name,artist:best.artist,mix:best.mixHint,score:best.score,source:'musicapi',confirmedAt:Date.now()};
-   t.studioResult='exact';
-   logSync(t,'Exact metadata match','100% local heuristic, provider URL available; no cart update');
- }else if(best.externalId){
-   // MusicAPI playlist transfers use service track IDs; a shop URL is not required.
-   // Never fabricate an unverified Beatport URL or claim checkout cart success.
-   t.studioResult='id_ready';
-   logSync(t,'Matched by ID','100% local heuristic, Beatport ID available; URL missing; playlist eligible');
+  t.match={url:best.url,title:best.name,artist:best.artist,mix:best.mixHint,score:best.score,source:'musicapi',confirmedAt:Date.now()};
+  t.studioResult='exact';
  }else{
-   t.studioResult='missing_url';
-   logSync(t,'Metadata match','100% local heuristic, no Beatport ID or URL; cannot transfer');
+  t.studioResult='id_ready';
  }
+ logSync(t,'Automatic metadata match','Title, artist and version align; unique Beatport ID; not purchase verification');
 }
 function studioEligible(t){return t.status==='pending'&&['exact','manual','id_ready'].includes(t.studioResult)&&Boolean(t.studioCandidate?.externalId)}
 function studioChosen(){return state.tracks.filter(t=>t.studioSelected!==false)}
@@ -174,7 +165,7 @@ async function studioImport(){
  try{
   for(const item of ids){
    const t=await spotifyGet('https://api.spotify.com/v1/tracks/'+item.id);
-   if(t?.name)rows.push({title:t.name,artist:(t.artists||[]).map(a=>a.name).join(', '),album:t.album?.name||'',source:'spotify'});
+   if(t?.name)rows.push({title:t.name,artist:(t.artists||[]).map(a=>a.name).join(', '),album:t.album?.name||'',isrc:t.external_ids?.isrc||'',source:'spotify'});
   }
   for(const item of playlists){
    const base='https://api.spotify.com/v1/playlists/'+item.id;
@@ -184,7 +175,7 @@ async function studioImport(){
     const data=await spotifyGet(next);
     for(const record of data.items||[]){
      const t=record.item||record.track||record;
-     if(t?.name&&(!t.type||t.type==='track'))list.push({title:t.name,artist:(t.artists||[]).map(a=>a.name).join(', '),source:'spotify'});
+     if(t?.name&&(!t.type||t.type==='track'))list.push({title:t.name,artist:(t.artists||[]).map(a=>a.name).join(', '),isrc:t.external_ids?.isrc||'',source:'spotify'});
     }
     next=data.next;
    }
@@ -221,8 +212,8 @@ function studioChoose(t,index){
  if(!c?.externalId)return toast('Beatport track ID missing. Cannot confirm this track.');
  t.studioCandidate=c;
  t.match={url:c.url,title:c.name,artist:c.artist,mix:c.mixHint,score:c.score,source:'musicapi',confirmedAt:Date.now()};
- t.studioResult=c.score===100?(c.url?'exact':'id_ready'):'manual';
- logSync(t,'Selected candidate','User selected match '+c.score+'% for playlist export');
+ t.studioResult='manual';
+ logSync(t,'Selected candidate','User reviewed '+(c.assessment?.candidateVersion||c.mixHint||'version')+'; metadata similarity '+c.score+'% for playlist export');
  render();
 }
 function handleMatching(a,t){const id=t.id;if(a==='searchMatch'){logSync(t,'Search opened','Beatport search opened in new tab');window.open(storeSearch(t),'_blank','noopener');return}
@@ -361,7 +352,7 @@ async function importPasted(){
     for(const item of ids){
       try{
         const t=await spotifyGet('https://api.spotify.com/v1/tracks/'+item.id);
-        if(t?.name)rows.push({title:t.name,artist:(t.artists||[]).map(a=>a.name).join(', '),album:t.album?.name||'',source:'spotify',spotifyUrl:'https://open.spotify.com/track/'+item.id});
+        if(t?.name)rows.push({title:t.name,artist:(t.artists||[]).map(a=>a.name).join(', '),album:t.album?.name||'',isrc:t.external_ids?.isrc||'',source:'spotify',spotifyUrl:'https://open.spotify.com/track/'+item.id});
         else fail++;
       }catch(err){fail++;if(fail===1)console.warn('Spotify track import issue',err)}
     }
@@ -376,7 +367,7 @@ async function importPasted(){
   if(added){$('#pasteTracks').value='';nav('library')}
   else if(!playlist.length)toast('No songs imported; check Spotify access and pasted format');
 }
-async function spotifyImport(){let m=($('#spotifyUrl').value||'').match(/(?:playlist\/|spotify:playlist:)([A-Za-z0-9]+)/);if(!m)return toast('Please enter a Spotify playlist URL');try{let p=await spotifyGet('https://api.spotify.com/v1/playlists/'+m[1]+'?fields=id,name'),next='https://api.spotify.com/v1/playlists/'+m[1]+'/items?limit=50',tracks=[],pages=0;while(next&&pages++<30){let r=await spotifyGet(next);for(let item of r.items||[]){let t=item.item||item.track||item;if(!t?.name||t.type&&t.type!=='track')continue;tracks.push({title:t.name,artist:(t.artists||[]).map(a=>a.name).join(', '),album:t.album?.name||'',source:'spotify'})}next=r.next}importTracks(tracks,p.name||'Spotify Playlist');nav('library')}catch(e){toast(e.message)}}
+async function spotifyImport(){let m=($('#spotifyUrl').value||'').match(/(?:playlist\/|spotify:playlist:)([A-Za-z0-9]+)/);if(!m)return toast('Please enter a Spotify playlist URL');try{let p=await spotifyGet('https://api.spotify.com/v1/playlists/'+m[1]+'?fields=id,name'),next='https://api.spotify.com/v1/playlists/'+m[1]+'/items?limit=50',tracks=[],pages=0;while(next&&pages++<30){let r=await spotifyGet(next);for(let item of r.items||[]){let t=item.item||item.track||item;if(!t?.name||t.type&&t.type!=='track')continue;tracks.push({title:t.name,artist:(t.artists||[]).map(a=>a.name).join(', '),album:t.album?.name||'',isrc:t.external_ids?.isrc||'',source:'spotify'})}next=r.next}importTracks(tracks,p.name||'Spotify Playlist');nav('library')}catch(e){toast(e.message)}}
 function edit(t){const title=prompt('Track title',t.title);if(title===null)return;t.title=title.trim()||t.title;const artist=prompt('Artist',t.artist);if(artist===null)return;t.artist=artist.trim()||t.artist;const remix=prompt('Remix / Mix',t.remix||'');if(remix!==null)t.remix=remix;const bpm=prompt('BPM',t.bpm||'');if(bpm!==null)t.bpm=bpm;const key=prompt('Key',t.key||'');if(key!==null)t.key=key;const genre=prompt('Genre',t.genre||'');if(genre!==null)t.genre=genre;const status=prompt('Status: pending | cart | owned | downloaded',t.status);if(status&&['pending','cart','owned','downloaded'].includes(status.toLowerCase()))t.status=status.toLowerCase();const path=prompt('Absolute local audio file path',t.filePath||'');if(path!==null)t.filePath=path;persist();render()}
 function bind(){const on=(sel,fn,event='click')=>{let e=$(sel);if(e)e.addEventListener(event,fn)};on('#landingBottomStart',()=>nav('welcome'));on('#landingLogin',()=>nav('welcome'));on('#landingPlaylistUrl',e=>{studioInput=e.target.value},'input');on('#landingImportForm',e=>{e.preventDefault();const link=$('#landingPlaylistUrl')?.value.trim();if(!link)return;studioInput=link;nav(localStorage.getItem('crateflow_onboarded')==='yes'?'import':'welcome')},'submit');on('#studioPaste',v=>{studioInput=v.target.value},'input');on('#studioImport',studioImport);on('#studioSync',()=>studioSync());on('#studioShowAll',()=>{studioShowAll=true;render()});on('#studioSelectAll',studioToggleAll);on('#studioClose',()=>{studioModal='';render()});on('#studioCancel',()=>{studioModal='';render()});on('#studioInfo',()=>{studioInfoOpen=!studioInfoOpen;render()});on('#studioPlaylistTitle',e=>{studioPlaylistName=e.target.value},'input');on('#studioCreatePlaylist',exportToBeatportPlaylist);document.querySelectorAll('.compact-check').forEach(el=>el.addEventListener('change',()=>{const t=state.tracks.find(t=>t.id===el.dataset.id);if(t){t.studioSelected=el.checked;persist();render()}}));on('#studioExport',studioOpenPlaylistDialog);on('#studioUseExisting',()=>{studioInput='';render()});on('#studioExtended',v=>{state.settings.preferExtended=v.target.checked;persist();render()},'change');on('#finishOnboarding',()=>{localStorage.setItem('crateflow_onboarded','yes');nav('overview')});on('#onboardImport',()=>{localStorage.setItem('crateflow_onboarded','yes');nav('import')});on('#preferExtended',e=>{state.settings.preferExtended=e.target.checked;persist();render()},'change');on('#searchFirstMatch',()=>{let t=state.tracks.find(t=>!t.match?.url&&t.status==='pending');if(!t)return toast('No unmatched tracks');window.open(storeSearch(t),'_blank','noopener');logSync(t,'Search opened','Beatport search opened');render()});on('#catalogBatch',lookupQueue);on('#downloadHistory',()=>download('crateflow-sync-history.json',JSON.stringify(state.syncHistory,null,2),'application/json'));on('#saveMusicApiSlug',()=>{let v=($('#musicApiSlug')?.value||'').trim().toLowerCase();if(!/^[a-z0-9][a-z0-9-]{1,62}$/.test(v))return toast('Check MusicAPI account slug');state.settings.musicApiSlug=v;persist();toast('MusicAPI slug saved')});on('#verifyBeatportLogin',()=>verifyBeatportConnection());on('#startBeatportLogin',()=>{const slug='tracky';state.settings.musicApiSlug=slug;persist();sessionStorage.removeItem('beatport_server_verified');sessionStorage.removeItem('beatport_auth_attempt');sessionStorage.removeItem('beatport_claimed_user');sessionStorage.removeItem('beatport_callback_notice');const returnUrl=location.origin+'/';window.location.assign('https://app.musicapi.com/'+slug+'/beatport/auth?returnUrl='+encodeURIComponent(returnUrl))});on('#exportBeatportRequest',()=>{const request='Subject: Beatport API integration request for CRATEFLOW\\n\\nHello Beatport Partnerships Team,\\n\\nI am developing CRATEFLOW, a personal DJ music manager that imports Spotify playlist metadata, identifies corresponding Beatport releases and lets the account holder review candidates before purchase. I would like to ask about authorized API access and OAuth integration. Specifically, are track search, user purchase history and adding an approved track to the user\'s default shopping cart available to third-party partners? Are there licensing, commercial or technical requirements? Checkout and payment would remain on Beatport.com.\\n\\nWebsite: '+location.origin+'\\n\\nThank you.';navigator.clipboard.writeText(request.replaceAll('\\n','\\n')).then(()=>toast('API request copied')).catch(()=>toast('Clipboard permission denied'))});on('#connectSpotify',spotifyConnect);on('#importSpotify',spotifyImport);on('#importPasted',importPasted);on('#clearPasted',()=>{$('#pasteTracks').value=''});on('#uploadCsv',()=>$('#csv').click());on('#quickAdd',()=>{let title=$('#quickTitle').value,artist=$('#quickArtist').value;if(!title.trim())return toast('Title required');importTracks([{title,artist}],'Manual additions');nav('library')});on('#search',e=>{search=e.target.value;let pos=e.target.selectionStart;render();$('#search').focus();$('#search').setSelectionRange(pos,pos)},'input');on('#filter',e=>{filter=e.target.value;render()},'change');on('#playlistFilter',e=>{playlistFilter=e.target.value;render()},'change');on('#searchNext',()=>{let t=state.tracks.find(t=>t.status==='pending');if(t)window.open(beatport(t),'_blank','noopener');else toast('Nothing pending')});on('#copyQueue',()=>{navigator.clipboard.writeText(state.tracks.filter(t=>t.status==='pending').map(t=>t.artist+' – '+t.title).join('\n')).then(()=>toast('Copied'))});on('#beatportSite',()=>window.open('https://www.beatport.com','_blank','noopener'));on('#backup',()=>download('crateflow-backup.json',JSON.stringify(state,null,2),'application/json'));on('#restoreBtn',()=>$('#restore').click());on('#csvExport',csvExport);on('#xmlExport',xmlExport);on('#saveSettings',()=>{state.settings.spotifyClientId=$('#clientId').value.trim();persist();toast('Settings saved')});on('#disconnectSpotify',()=>{['spotify_access','spotify_refresh','spotify_expiry'].forEach(k=>sessionStorage.removeItem(k));render()});on('#clearAll',()=>{if(confirm('Delete all local tracks and playlists?')){state=structuredClone(defaults);persist();render()}})}
 document.addEventListener('click',e=>{let p=e.target.closest('[data-page]');if(p)return nav(p.dataset.page);let a=e.target.closest('[data-act]');if(!a)return;let t=state.tracks.find(t=>t.id===a.dataset.id);if(!t)return;if(a.dataset.act==='studioRetry')return studioSync([t.id]);if(a.dataset.act==='studioChoose')return studioChoose(t,Number(a.dataset.index||0));if(a.dataset.act==='catalogLookup')return lookupMusicApi(t);if(a.dataset.act==='acceptCatalog')return applyCatalogCandidate(t,Number(a.dataset.index||0));if(['searchMatch','saveMatch','markCart','markUnmatched'].includes(a.dataset.act))return handleMatching(a.dataset.act,t);if(a.dataset.act==='beatport')window.open(beatport(t),'_blank','noopener');else if(a.dataset.act==='edit')edit(t);else if(a.dataset.act==='delete'&&confirm('Remove '+t.title+'?')){state.tracks=state.tracks.filter(x=>x.id!==t.id);persist();render()}});
