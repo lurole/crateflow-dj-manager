@@ -5,7 +5,8 @@
   "description": "User-initiated Buy All action on an open Beatport playlist. Does not purchase music.",
   "permissions": [
     "activeTab",
-    "scripting"
+    "scripting",
+    "storage"
   ],
   "host_permissions": [
     "https://www.beatport.com/*",
@@ -20,5 +21,26 @@
       "id": "crateflow-cart@lurole.com",
       "strict_min_version": "109.0"
     }
-  }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://crateflow-dj-manager.vercel.app/*"
+      ],
+      "js": [
+        "crateflow-bridge.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.beatport.com/*",
+        "https://beatport.com/*"
+      ],
+      "js": [
+        "beatport-assistant.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
 }
