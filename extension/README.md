@@ -1,31 +1,40 @@
-# CRATEFLOW Beatport Cart Companion — experimental
+# CRATEFLOW Browser Cart Companion — developer beta
 
-This optional cross-browser WebExtensions prototype is **not** a browser-independent direct cart API. Its job is narrowly scoped: once the user has opened a **Beatport playlist detail page** in the same browser, click the visible **Buy All** button in response to a direct user action.
+## Current handoff
 
-## How to test (development only)
+1. In the CRATEFLOW web app, match and select tracks, then click **Send to Cart in Beatport** and **Prepare Beatport Cart**. MusicAPI creates a Beatport playlist.
+2. When the success panel appears, click **Open Beatport & Continue to Cart**. The CRATEFLOW content script receives the exact playlist name, provider playlist ID, count and a one-time random nonce, then stores a temporary job in extension-local storage (20-minute expiry). No passwords, account tokens or cookies are transferred.
+3. Beatport opens in a new tab. The Beatport content script shows a small CRATEFLOW assistant with the playlist name. Open the playlist yourself or use **Open playlist** if Beatport exposes a *unique, exact-title* playlist link in the visible page.
+4. On the matching playlist detail page, the assistant enables **Confirm Buy All** only if a visible page heading exactly equals the transferred playlist title.
+5. The assistant checks that there is **exactly one visible “Buy All” / “Add all to cart” button**, asks you to confirm, then clicks that Beatport UI button. The session is marked **click_sent**, not **cart_confirmed**.
+6. **Verify the actual Beatport cart**. The companion cannot certify that the click was accepted; it does not purchase anything.
 
-1. In CRATEFLOW, select the matched tracks and use **Send to Cart in Beatport**. CRATEFLOW creates a Beatport playlist through MusicAPI.
-2. Open Beatport in the same browser. Locate the newly created playlist and open its detail page.
-3. Load the local `extension` folder as a temporary unpacked extension in a development browser:
-   - Chromium / Edge: open the extensions management page, enable developer mode, choose **Load unpacked**, select this folder.
-   - Firefox: open `about:debugging#/runtime/this-firefox`, choose **Load Temporary Add-on**, select `manifest.json`.
-   - Safari: Apple requires conversion and packaging as a Safari Web Extension using Xcode. This package is **not** yet ready for Safari distribution.
-4. On the Beatport playlist page, open the extension popup and click **Add open playlist to cart**.
-5. The extension locates exactly one visible playlist-wide **Buy All** / **Add all to cart** control and asks for confirmation. If no unique visible control exists, it stops without clicking anything.
-6. **Verify the actual cart in Beatport**. The extension only confirms a click was sent; it cannot verify that the store added products.
+The standalone extension toolbar popup can open Beatport and inspect pending handoff state, but never generically clicks unverified cart controls.
 
-## Status and limitations
+## Install for a development test (not store-published)
 
-- Prototype only; not tested against Beatport's live rendered DOM. The selector may need adjustment to Beatport's actual button roles/text and frontend state.
-- This extension does not collect passwords, impersonate Beatport's OAuth or call undocumented checkout endpoints. It never submits a purchase.
-- No direct CRATEFLOW-to-extension messaging is implemented yet. It doesn't know the created playlist URL because MusicAPI currently returns a service playlist ID, not a verified Beatport website URL.
-- Platform support is **planned**, not verified: Manifest V3 is broadly supported in Chromium and modern Firefox, with differences; Safari requires Apple packaging.
-- Do **not** distribute as a finished plugin or claim an added-to-cart success before live verification. Always inspect the Beatport cart and avoid duplicate additions.
-- For full production: identify the exact playlist detail URL through a documented provider field, add a CRATEFLOW-to-extension handoff with origin validation, verify cart state after clicks, test Chrome/Edge/Firefox/Safari, protect against duplicate items, and obtain any necessary provider approval.
+- Download the GitHub repository as ZIP, extract it, and locate the `extension` folder.
+- Chrome/Edge: Extensions → Developer mode → Load unpacked → choose `extension`.
+- Firefox: `about:debugging#/runtime/this-firefox` → Load Temporary Add-on → `extension/manifest.json`.
+- Safari: requires Xcode packaging as a Safari Web Extension, **not yet prepared or tested**.
 
-MusicAPI documents playlist creation and writes but not a shopping-cart mutation:
-https://musicapi.com/docs/endpoints/create-playlist
-https://musicapi.com/docs/endpoints/add-items-to-playlist
+After enabling the extension, reload CRATEFLOW and Beatport. The app runs at `https://crateflow-dj-manager.vercel.app/`; the bridge intentionally rejects all other origins.
 
-Beatport documents the playlist Buy All control:
-https://support.beatport.com/hc/en-us/articles/12129947455764-Playlist-Purchasing
+## Security and known limitations
+
+- Browser extension installation is optional; web-only users can still create a playlist and click Buy All manually.
+- Only the explicitly queued playlist title is accepted; never act on a generic unknown page. The companion checks the title *again* immediately before clicking.
+- No undocumented private Beatport endpoints are called. No payment or checkout flows are automated.
+- A queued action lasts 20 minutes; the browser stores only playlist name, provider ID, count, nonce, creation time and status.
+- The job does not cross browser profiles or browsers. A user must use the web app and Beatport **in the same browser profile**.
+- Provider playlist ID cannot be assumed to be a website ID. Because MusicAPI's documented playlist schema does **not** provide a Beatport website URL, the assistant finds the target via an exact visible Beatport playlist link or asks the user to open it.
+- The selector and title check require **live testing on an authenticated Beatport account**; Beatport may use different copy or structure. This is a prototype, not a verified one-click cart integration.
+- Browser compatibility: Chromium/Edge and Firefox are implementation targets; Safari requires packaging. No supported browser has yet been end-to-end verified.
+- Caution: repeated Buy All can duplicate cart items. Check cart state before retrying.
+
+## Authoritative docs
+
+- Beatport playlist Buy All: https://support.beatport.com/hc/en-us/articles/12129947455764-Playlist-Purchasing
+- MusicAPI playlist creation: https://musicapi.com/docs/endpoints/create-playlist
+- MusicAPI playlist lookup: https://musicapi.com/docs/endpoints/get-playlist
+- WebExtensions cross-browser messaging: https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Content_scripts
