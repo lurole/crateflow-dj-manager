@@ -83,7 +83,7 @@ function studioView(){
  const spotify=!!sessionStorage.getItem('spotify_access');
  const beatport=sessionStorage.getItem('beatport_server_verified')==='yes';
  const tracks=state.tracks.filter(t=>!['owned','downloaded'].includes(t.status));
- const exact=tracks.filter(t=>t.studioResult==='exact').length;
+ const exact=tracks.filter(t=>t.studioResult==='exact'||t.studioResult==='manual').length;
  const missing=tracks.filter(t=>t.studioResult==='missing_url').length;
  const review=tracks.filter(t=>['review','error'].includes(t.studioResult)).length;
  const untouched=tracks.filter(t=>!t.studioResult).length;
@@ -96,11 +96,11 @@ function studioView(){
  '<div class="row gap"><button class="btn primary" id="studioSync" '+(studioRunning||!tracks.length?'disabled':'')+'>'+(studioRunning?'SEARCHING…':'MATCH UP TO 10 TRACKS')+'</button><span class="muted">API usage per search · no Beatport cart changes</span></div>'+
  (studioRunning?'<div class="studio-progress"><div style="width:'+percent+'%"></div></div><p>'+studioProgress.done+' / '+studioProgress.total+' checked</p>':'')+
  (studioError?'<p class="studio-error">'+esc(studioError)+'</p>':'')+
- '<div class="studio-metrics"><div><strong>'+exact+'</strong><small>Exact match + URL</small></div><div><strong>'+missing+'</strong><small>100%, link missing</small></div><div><strong>'+review+'</strong><small>Review needed</small></div><div><strong>'+untouched+'</strong><small>Not searched</small></div></div>'+
+ '<div class="studio-metrics"><div><strong>'+exact+'</strong><small>Selected with link</small></div><div><strong>'+missing+'</strong><small>100%, link missing</small></div><div><strong>'+review+'</strong><small>Review needed</small></div><div><strong>'+untouched+'</strong><small>Not searched</small></div></div>'+
  '<div class="studio-results">'+(tracks.length?tracks.map(t=>{
  const result=t.studioResult||'pending';
  const c=t.studioCandidate;
- const label=result==='exact'?'100% selected':result==='missing_url'?'100% · link needed':result==='review'?'Review match':result==='error'?'Search error':'Not searched';
+ const label=result==='exact'?'100% selected':result==='manual'?'Selected · '+(t.match?.score??'—')+'%':result==='missing_url'?'100% · link needed':result==='review'?'Review match':result==='error'?'Search error':'Not searched';
  const matches=t.catalog?.candidates||[];
  return '<div class="studio-track"><div class="studio-track-main"><div><strong>'+esc(t.title)+'</strong><p>'+esc(t.artist)+'</p></div><span class="pill '+(result==='exact'?'':'pending')+'">'+label+'</span></div>'+
  (c?'<div class="studio-selected">'+esc(c.name)+' · '+esc(c.artist)+(c.url?'<a href="'+esc(c.url)+'" target="_blank" rel="noopener noreferrer">OPEN TRACK</a>':'<span>Store link unavailable</span>')+'</div>':'')+
@@ -170,7 +170,7 @@ function studioChoose(t,index){
  if(!c?.url)return toast('Beatport URL missing. Cannot confirm this track.');
  t.studioCandidate=c;
  t.match={url:c.url,title:c.name,artist:c.artist,mix:c.mixHint,score:c.score,source:'musicapi',confirmedAt:Date.now()};
- t.studioResult='exact';
+ t.studioResult=c.score===100?'exact':'manual';
  logSync(t,'Selected candidate','User selected match '+c.score+'%; cart unchanged');
  render();
 }
