@@ -78,10 +78,14 @@ window.addEventListener('message',event=>{
  if(message.type==='JOB_ERROR'){studioCompanionStatus='Cart transfer could not start: '+(message.reason||'unknown error');toast(studioCompanionStatus);render();return}
  if(message.type==='CART_PROGRESS'){
   studioCartJob.progress=message;
+  for(const item of message.results||[]){
+   const t=state.tracks.find(t=>t.id===item.id);
+   if(t){t.cartSyncState=item.status;if(item.status==='clicked_unverified'||item.status==='already_in_cart')logSync(t,'Cart browser action',item.status==='already_in_cart'?'Beatport UI suggested already in cart':'Beatport add-to-cart click sent; NOT independently verified');}
+  }
   studioCompanionStatus='Beatport: '+message.done+'/'+studioCartJob.count+' tracks processed';
   if(message.finished){
    studioCartJob.finished=true;
-   studioCompanionStatus='Cart operation completed. Check Beatport cart; '+message.clicked+' click(s) sent, '+message.failed+' failed.';
+   studioCompanionStatus='Cart sync attempted: '+message.clicked+' click(s)/already present; '+message.failed+' failed. Verify the Beatport cart.';persist();
   }
   render();
  }
@@ -199,7 +203,7 @@ function studioView(){
   const reviewOption=result==='review'&&best?'<div class="compact-options"><div class="compact-option"><span>'+esc(best.name)+' <small>'+esc(best.artist)+' · '+best.score+'%</small></span><button class="btn" data-act="studioChoose" data-id="'+t.id+'" data-index="'+best.index+'" '+(!best.externalId?'disabled':'')+'>SELECT</button></div></div>':'';
   return '<div class="compact-track"><input class="compact-check" type="checkbox" data-id="'+t.id+'" aria-label="Select '+esc(t.title)+'" '+(checked?'checked':'')+'>'+
    '<div class="compact-name"><strong>'+esc(t.title)+'</strong><small>'+esc(t.artist)+'</small>'+(result==='error'?'<small class="studio-error">'+esc(t.studioError||'Search failed')+'</small>':'')+'</div>'+
-   '<div class="compact-status"><span class="pill '+(result==='exact'||result==='id_ready'?'':'pending')+'">'+status+'</span></div>'+
+   '<div class="compact-status"><span class="pill '+(result==='exact'||result==='id_ready'?'':'pending')+'">'+(t.cartSyncState==='failed'?'Cart failed':t.cartSyncState==='clicked_unverified'?'Cart click sent':t.cartSyncState==='already_in_cart'?'Already in cart':status)+'</span></div>'+
    '<div class="compact-action"><button class="btn compact-cart" data-act="studioCartOne" data-id="'+t.id+'" aria-label="Send '+esc(t.title)+' to Beatport cart" title="Send to Beatport cart (playlist handoff)" '+(!studioEligible(t)||studioRunning||studioExporting?'disabled':'')+'>🛒</button></div>'+reviewOption+'</div>';
  };
  return head('MUSIC WORKFLOW','Import & Sync','Import, match and transfer your music to Beatport.')+
@@ -212,7 +216,7 @@ function studioView(){
  (studioRunning?'<div class="studio-progress"><div style="width:'+percent+'%"></div></div><p class="note">'+studioProgress.done+' of '+studioProgress.total+' searched</p>':'')+
  (studioError?'<p class="studio-error">'+esc(studioError)+'</p>':'')+
  '<div class="compact-list"><div class="compact-col-head"><span></span><span>SONG</span><span>STATUS</span><span>CART</span></div>'+list.map(row).join('')+(tracks.length>30&&!studioShowAll?'<button id="studioShowAll" class="btn">SHOW ALL '+tracks.length+' SONGS</button>':'')+'</div></div>'+
- ((studioExportResult||studioCartJob)?'<div class="panel studio-main studio-transfer"><div class="compact-header"><div><div class="eyebrow">03 · BEATPORT</div><h2>Transfer status</h2></div><div class="row">'+(studioCartJob?'<span class="pill pending">'+esc(studioCompanionStatus)+'</span>':'')+(studioExportResult?'<button class="btn studio-info-btn" id="studioInfo">'+(studioInfoOpen?'HIDE TRANSFER INFO':'✓ LAST PLAYLIST TRANSFER SUCCESS')+'</button>':'')+'</div></div>'+(studioExportResult&&studioInfoOpen?'<div class="studio-export-success"><strong>'+esc(studioExportResult.added)+' songs transferred to playlist: '+esc(studioExportResult.name)+'</strong><p>Beatport playlist created. Open that playlist on Beatport and choose Buy All. Click OPEN BEATPORT &amp; CONTINUE TO CART. The optional browser companion can recognize this playlist when you open it and assist with Buy All; the cart is not yet verified.</p><a href="https://www.beatport.com/" target="_blank" rel="noopener noreferrer">OPEN BEATPORT ↗</a><a href="https://github.com/lurole/crateflow-dj-manager/tree/main/extension" target="_blank" rel="noopener noreferrer">BROWSER COMPANION (BETA) ↗</a></div>':'')+'</div>':'')+
+ ((studioExportResult||studioCartJob)?'<div class="panel studio-main studio-transfer"><div class="compact-header"><div><div class="eyebrow">03 · BEATPORT</div><h2>Transfer status</h2></div><div class="row">'+(studioCartJob?'<span class="pill pending">'+esc(studioCompanionStatus)+'</span>':'')+(studioExportResult?'<button class="btn studio-info-btn" id="studioInfo">'+(studioInfoOpen?'HIDE TRANSFER INFO':'✓ LAST PLAYLIST TRANSFER SUCCESS')+'</button>':'')+'</div></div>'+(studioExportResult&&studioInfoOpen?'<div class="studio-export-success"><strong>'+esc(studioExportResult.added)+' songs transferred to playlist: '+esc(studioExportResult.name)+'</strong><p>Beatport playlist created successfully. This is a separate action and does not change your cart.</p><a href="https://www.beatport.com/" target="_blank" rel="noopener noreferrer">OPEN BEATPORT ↗</a><a href="https://github.com/lurole/crateflow-dj-manager/tree/main/extension" target="_blank" rel="noopener noreferrer">BROWSER COMPANION (BETA) ↗</a></div>':'')+'</div>':'')+
  (studioModal==='playlist'?'<div class="studio-overlay"><div class="studio-dialog" role="dialog" aria-modal="true" aria-labelledby="studioDialogTitle"><button class="studio-close" id="studioClose" aria-label="Close">×</button><h2 id="studioDialogTitle">Create Beatport Playlist</h2><label class="label" for="studioPlaylistTitle">Playlist title</label><input class="field" id="studioPlaylistTitle" maxlength="75" value="'+esc(studioPlaylistName)+'"><div class="row studio-dialog-actions"><button class="btn" id="studioCancel">Cancel</button><button class="btn primary" id="studioCreatePlaylist">Create Playlist</button></div></div></div>':'');
 }
 async function studioImport(){
