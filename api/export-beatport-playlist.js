@@ -1,0 +1,41 @@
+import crypto from 'node:crypto';
+// Explicit user action only. Creates a Beatport playlist; DOES NOT change the shopping cart.
+const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export default async function handler(req,res){
+ res.setHeader('Cache-Control','no-store');
+ if(req.method!=='POST'){res.setHeader('Allow','POST');return res.status(405).json({ok:false,error:'Method not allowed'});}
+ const host=String(req.headers['x-forwarded-host']||req.headers.host||'').split(',')[0];
+ if(!host||req.headers.origin!=='https://'+host)return res.status(403).json({ok:false,error:'Invalid origin'});
+ if(process.env.MUSICAPI_ENABLE_VERIFICATION!=='true')return res.status(503).json({ok:false,error:'MusicAPI integration disabled'});
+ const clientId=process.env.MUSICAPI_CLIENT_ID,secret=process.env.MUSICAPI_CLIENT_SECRET;
+ if(!clientId||!secret)return res.status(503).json({ok:false,error:'MusicAPI credentials missing'});
+ const rawCookie=String(req.headers.cookie||'').split(';').map(x=>x.trim()).find(x=>x.startsWith('cf_bp='))?.slice(6);
+ if(!rawCookie)return res.status(401).json({ok:false,error:'Connect Beatport first'});
+ const parts=rawCookie.split('.');
+ if(parts.length!==2)return res.status(401).json({ok:false,error:'Invalid Beatport session'});
+ const signature=crypto.createHmac('sha256',secret).update('crateflow-beatport-v1.'+parts[0]).digest('base64url');
+ if(parts[1].length!==signature.length||!crypto.timingSafeEqual(Buffer.from(parts[1]),Buffer.from(signature)))return res.status(401).json({ok:false,error:'Invalid Beatport session'});
+ let session;try{session=JSON.parse(Buffer.from(parts[0],'base64url').toString('utf8'))}catch{return res.status(401).json({ok:false,error:'Invalid Beatport session'})}
+ if(!UUID.test(session?.uid||'')||!Number.isInteger(session?.exp)||session.exp<Math.floor(Date.now()/1000))return res.status(401).json({ok:false,error:'Beatport connection expired; reconnect'});
+ const payload=typeof req.body==='string'?JSON.parse(req.body||'{}'):req.body;
+ const ids=payload?.trackIds, title=String(payload?.name||'CRATEFLOW Selection').trim().slice(0,75);
+ if(!Array.isArray(ids)||ids.length<1||ids.length>20||!title)return res.status(400).json({ok:false,error:'Choose 1 to 20 confirmed tracks'});
+ if(!ids.every(x=>typeof x==='string'&&/^[A-Za-z0-9_-]{1,80}$/.test(x)))return res.status(400).json({ok:false,error:'Invalid Beatport track identifiers'});
+ const unique=[...new Set(ids)];
+ if(unique.length!==ids.length)return res.status(400).json({ok:false,error:'Duplicate tracks must be removed before export'});
+ const auth='Basic '+Buffer.from(clientId+':'+secret).toString('base64');
+ const base='https://api.musicapi.com/api/'+encodeURIComponent(session.uid)+'/playlists';
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),16000);
+ const headers={Authorization:auth,'Content-Type':'application/json',Accept:'application/json'};
+ try{
+  const created=await fetch(base,{method:'POST',headers,body:JSON.stringify({name:title,visibility:'private'}),signal:controller.signal});
+  const playlist=await created.json().catch(()=>({}));
+  if(!created.ok)return res.status(502).json({ok:false,stage:'create',error:'Beatport playlist could not be created',providerStatus:created.status});
+  const playlistId=playlist?.id;
+  if(typeof playlistId!=='string'&&typeof playlistId!=='number')return res.status(502).json({ok:false,stage:'create',error:'MusicAPI returned an unexpected playlist identifier'});
+  const added=await fetch(base+'/'+encodeURIComponent(String(playlistId))+'/items',{method:'POST',headers,body:JSON.stringify({itemIds:unique}),signal:controller.signal});
+  if(!added.ok)return res.status(502).json({ok:false,stage:'add',error:'Playlist was created, but adding tracks failed. Check Beatport before trying again to avoid duplicate playlists.',providerStatus:added.status,playlistId:String(playlistId)});
+  return res.status(200).json({ok:true,playlistId:String(playlistId),added:unique.length,name:title,cartUpdated:false});
+ }catch{return res.status(502).json({ok:false,error:'MusicAPI playlist export failed or timed out. Check Beatport for a partial playlist before retrying'});}
+ finally{clearTimeout(timer)}
+}
