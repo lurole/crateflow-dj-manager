@@ -31,3 +31,8 @@ New browser users are shown **Get Started**, a simplified Spotify and Beatport c
 Beatport login is initiated by a hosted MusicAPI page, and the optional verification API remains cost-gated using `MUSICAPI_ENABLE_VERIFICATION`. This beta only stores a session-level verified indicator and does not support real multi-user accounts, durable OAuth connections, cloud sync, or automatic Beatport cart mutations. Spotify API app development restrictions still apply.
 
 Before public launch: implement user authentication and secure session binding for MusicAPI auth attempts, durable per-user connections and catalog data, billing controls, and authorized Beatport cart access. Never store a MusicAPI secret or Beatport password in browser-accessible code.
+
+## Automatic Beatport sign-in verification (v0.3.1)
+The MusicAPI sign-in callback now automatically invokes `/api/verify-beatport` when it contains a valid Beatport success response and expected identifiers. During verification the onboarding screen shows a pending state. A verified response with `service: 'beatport'` marks the current browser session as connected; failures show a retry button, without falsely claiming a connection. No second user confirmation click is required for a successful return. The existing server-side feature flag `MUSICAPI_ENABLE_VERIFICATION=true` must remain enabled for this beta feature to operate, and any API charge must be considered.
+
+This connection status is limited to the current browser session. Production-grade multi-user identity binding, durable account sessions, and Beatport cart write operations remain unimplemented.
