@@ -24,10 +24,11 @@ test('radio edit is not silently accepted for an extended mix',()=>{
 
 test('named remixes must match their actual remixer',()=>{
  const t=track('Closer (Yotto Remix)');
- const [wrong,correct]=matches(t,[candidate('Closer (Sasha Remix)','Adriatique','1'),candidate('Closer (Yotto Remix)','Adriatique','2')]);
+ const ranked=matches(t,[candidate('Closer (Sasha Remix)','Adriatique','1'),candidate('Closer (Yotto Remix)','Adriatique','2')]);
+ const wrong=ranked.find(c=>c.externalId==='1'),correct=ranked.find(c=>c.externalId==='2');
  assert.equal(correct.assessment.autoEligible,true);
  assert.equal(wrong.assessment.autoEligible,false);
- assert.equal(matching.bestAutomatic(t,[wrong,correct]).externalId,'2');
+ assert.equal(matching.bestAutomatic(t,ranked).externalId,'2');
 });
 
 test('separately specified desired remix is respected',()=>{
