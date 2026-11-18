@@ -1,0 +1,370 @@
+
+/* ====================================================================
+   CRATEFLOW / APP THEME V2 — matches AgentFlow-inspired landing
+   Scoped to workspace only. Public landing CSS remains untouched.
+   Soft Sand #F0E5DB | Mocha Green #474329 | Deep Mocha #27291F
+   ==================================================================== */
+html:has(body:not(.landing-mode)){background:#27291f;color-scheme:dark}
+body:not(.landing-mode){
+ --sand:#F0E5DB;--mocha:#474329;--mocha-deep:#27291f;--ink:#F0E5DB;
+ --muted:#bbb49f;--line:rgba(240,229,219,.17);--paper:#32342a;
+ --glass:rgba(240,229,219,.07);--app-surface:#34362a;--app-hover:rgba(240,229,219,.085);
+ --app-soft:#d2c9b5;--app-border:rgba(240,229,219,.16);
+ background:#27291f;color:#F0E5DB;color-scheme:dark;
+ font-family:'DM Sans',sans-serif;
+}
+body:not(.landing-mode) .shell{display:block;min-height:100vh;background:#27291f}
+body:not(.landing-mode) .shell>aside{
+ position:sticky;top:0;z-index:90;display:flex;flex-direction:row;align-items:center;
+ justify-content:space-between;gap:24px;width:100%;min-width:0;height:82px;
+ padding:0 clamp(20px,4.2vw,72px);margin:0;border:0;
+ border-bottom:1px solid var(--app-border);
+ background:rgba(39,41,31,.95);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);
+}
+body:not(.landing-mode) .shell>aside .logo{
+ display:block;flex-shrink:0;margin:0;padding:0;border:0;background:none;
+ font:700 21px/1 'Space Grotesk',sans-serif;letter-spacing:-1px;color:#F0E5DB;text-align:left
+}
+body:not(.landing-mode) .shell>aside .logo span.logo-mark{
+ color:#F0E5DB;font-size:10px;vertical-align:top;top:0;margin-left:3px
+}
+body:not(.landing-mode) .shell>aside .logo small{
+ display:block;margin:6px 0 0;color:#c4baa6;font:700 8px 'DM Sans',sans-serif;letter-spacing:1.8px
+}
+body:not(.landing-mode) .shell>aside .section{display:none}
+body:not(.landing-mode) .shell>aside nav{
+ display:flex;align-items:center;justify-content:flex-end;flex-wrap:nowrap;gap:2px;
+ overflow-x:auto;scrollbar-width:none;min-width:0;width:auto;margin-left:auto;
+}
+body:not(.landing-mode) .shell>aside nav::-webkit-scrollbar{display:none}
+body:not(.landing-mode) .shell>aside nav button{
+ appearance:none;position:relative;white-space:nowrap;flex-shrink:0;border:1px solid transparent;
+ border-radius:5px;background:transparent;color:#bbb49f;font:800 10px 'DM Sans',sans-serif;
+ letter-spacing:.85px;padding:12px clamp(6px,.87vw,14px);transition:background .2s,color .2s
+}
+body:not(.landing-mode) .shell>aside nav button:hover{background:rgba(240,229,219,.085);color:#F0E5DB}
+body:not(.landing-mode) .shell>aside nav button.active{
+ background:rgba(240,229,219,.12);color:#F0E5DB;border-color:rgba(240,229,219,.12)
+}
+body:not(.landing-mode) .shell>aside nav button.active:after{display:none}
+body:not(.landing-mode) .shell>aside .sidebar-bottom{display:none}
+body:not(.landing-mode) main{
+ position:relative;isolation:isolate;width:100%;min-width:0;min-height:calc(100vh - 82px);
+ background:#27291f;
+}
+body:not(.landing-mode) main:before{
+ content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+ background:
+  radial-gradient(ellipse 800px 470px at 79% 8%,rgba(132,121,94,.15),transparent 78%),
+  linear-gradient(to right,rgba(240,229,219,.035) 1px,transparent 1px),
+  linear-gradient(to bottom,rgba(240,229,219,.035) 1px,transparent 1px);
+ background-size:auto,90px 90px,90px 90px;
+ mask-image:linear-gradient(to bottom,black 0,rgba(0,0,0,.5) 600px,transparent 1150px);
+}
+body:not(.landing-mode) main>header{
+ position:relative;z-index:1;height:52px;padding:0 clamp(20px,4.2vw,72px);
+ display:flex;align-items:center;justify-content:space-between;border:0;
+ color:#aca48f;font:800 9px 'DM Sans',sans-serif;letter-spacing:1.8px
+}
+body:not(.landing-mode) main>header .user{display:block;color:#d6cbb8;letter-spacing:1.3px}
+body:not(.landing-mode) main>header .header-asterisk{color:#e6d9c5}
+body:not(.landing-mode) #view{
+ position:relative;z-index:1;max-width:1520px;width:100%;
+ padding:20px clamp(20px,4.2vw,72px) 105px;margin:0 auto;
+ color:#F0E5DB
+}
+body:not(.landing-mode) #view h1,body:not(.landing-mode) #view h2,
+body:not(.landing-mode) #view h3{color:#F0E5DB;font-family:'Space Grotesk',sans-serif}
+body:not(.landing-mode) #view h1{
+ font-size:clamp(38px,5vw,66px);font-weight:600;letter-spacing:-.068em;line-height:1.1
+}
+body:not(.landing-mode) #view h2{font-size:clamp(23px,2.4vw,34px);letter-spacing:-.055em;font-weight:600}
+body:not(.landing-mode) #view p{color:#bbb49f;line-height:1.72}
+body:not(.landing-mode) #view .eyebrow{
+ font:800 10px 'DM Sans',sans-serif;letter-spacing:2.25px;color:#dcd0bd;text-transform:uppercase
+}
+body:not(.landing-mode) #view .muted,body:not(.landing-mode) #view .note{color:#bdb4a1}
+body:not(.landing-mode) #view .label{
+ color:#d7ceba;font:800 10px 'DM Sans',sans-serif;letter-spacing:1.05px
+}
+body:not(.landing-mode) #view .highlight{color:#e8d8bf}
+body:not(.landing-mode) #view .panel,
+body:not(.landing-mode) #view .card,
+body:not(.landing-mode) #view .onboard-card,
+body:not(.landing-mode) #view .table{
+ background:rgba(240,229,219,.055);border:1px solid rgba(240,229,219,.17);
+ color:#F0E5DB;border-radius:11px;box-shadow:0 12px 36px rgba(9,12,6,.08)
+}
+body:not(.landing-mode) #view .panel{padding:clamp(20px,2.7vw,36px)}
+body:not(.landing-mode) #view .card{padding:23px}
+body:not(.landing-mode) #view .card label{color:#bdb4a1;font-weight:700;letter-spacing:1.2px}
+body:not(.landing-mode) #view .card strong{color:#F0E5DB;letter-spacing:-.06em}
+body:not(.landing-mode) #view .card small{color:#bbb49f}
+body:not(.landing-mode) #view .banner,
+body:not(.landing-mode) #view .onboard-next{
+ background:radial-gradient(ellipse at 85% 20%,rgba(240,229,219,.13),transparent 60%),
+ linear-gradient(125deg,rgba(79,76,53,.72),rgba(39,41,31,.72));
+ border:1px solid rgba(240,229,219,.2);border-radius:11px;color:#F0E5DB
+}
+body:not(.landing-mode) #view .banner h2{color:#F0E5DB}
+body:not(.landing-mode) #view .banner p{color:#c8bdab}
+body:not(.landing-mode) #view .btn{
+ appearance:none;background:rgba(240,229,219,.065);border:1px solid rgba(240,229,219,.3);
+ border-radius:6px;color:#F0E5DB;font:800 11px 'DM Sans',sans-serif;
+ letter-spacing:.65px;padding:12px 17px;transition:transform .2s,background .2s,border-color .2s;
+}
+body:not(.landing-mode) #view .btn:hover{background:rgba(240,229,219,.16);border-color:rgba(240,229,219,.6);filter:none;transform:translateY(-1px)}
+body:not(.landing-mode) #view .btn.primary{
+ background:#F0E5DB;border-color:#F0E5DB;color:#474329;box-shadow:0 8px 32px rgba(240,229,219,.075)
+}
+body:not(.landing-mode) #view .btn.primary:hover{background:#fff3e7;border-color:#fff3e7;box-shadow:0 10px 32px rgba(240,229,219,.12)}
+body:not(.landing-mode) #view .btn:disabled{cursor:not-allowed;opacity:.42;transform:none;box-shadow:none}
+body:not(.landing-mode) #view .btn.danger{color:#efb5aa}
+body:not(.landing-mode) #view .field,
+body:not(.landing-mode) #view textarea.field,
+body:not(.landing-mode) #view select.field{
+ border:1px solid rgba(240,229,219,.24);background:rgba(22,24,18,.38);
+ color:#F0E5DB;border-radius:7px;padding:14px 16px;
+}
+body:not(.landing-mode) #view .field::placeholder{color:#9c9686}
+body:not(.landing-mode) #view .field:focus{
+ outline:1px solid #e8d7ba;border-color:#e8d7ba;box-shadow:0 0 0 3px rgba(240,229,219,.09)
+}
+body:not(.landing-mode) #view select.field option{background:#27291f;color:#F0E5DB}
+body:not(.landing-mode) #view input[type=checkbox]{accent-color:#F0E5DB}
+body:not(.landing-mode) #view .pill{
+ background:rgba(240,229,219,.13);border:1px solid rgba(240,229,219,.17);
+ color:#F0E5DB;border-radius:100px;font-weight:700
+}
+body:not(.landing-mode) #view .pill.pending{background:rgba(240,229,219,.055);color:#bcb4a3}
+body:not(.landing-mode) #view .pill.cart{background:rgba(208,185,141,.14);color:#e8d4b2}
+body:not(.landing-mode) #view .table{overflow-x:auto}
+body:not(.landing-mode) #view table{color:#F0E5DB}
+body:not(.landing-mode) #view th{
+ color:#b9af9b;border-bottom:1px solid rgba(240,229,219,.18);letter-spacing:1.3px
+}
+body:not(.landing-mode) #view td{color:#F0E5DB;border-bottom:1px solid rgba(240,229,219,.12)}
+body:not(.landing-mode) #view td small{color:#bcb29f}
+body:not(.landing-mode) #view a{color:#ecdbc1}
+body:not(.landing-mode) #view .listrow{border-bottom:1px solid rgba(240,229,219,.13);color:#F0E5DB}
+body:not(.landing-mode) #view .empty{color:#aaa18d}
+body:not(.landing-mode) #view .advanced{border-color:rgba(240,229,219,.16)}
+body:not(.landing-mode) #view .advanced summary{color:#F0E5DB}
+body:not(.landing-mode) #view .onboard-icon{
+ background:rgba(240,229,219,.12);border:1px solid rgba(240,229,219,.16);
+ border-radius:9px;color:#F0E5DB
+}
+body:not(.landing-mode) #view .onboard-copy h2{color:#F0E5DB}
+body:not(.landing-mode) #view .onboard-card p{color:#bcb3a0}
+body:not(.landing-mode) #view .catalog-candidate{
+ background:rgba(240,229,219,.065);border-color:rgba(240,229,219,.21);color:#F0E5DB
+}
+body:not(.landing-mode) #view .catalog-candidate strong{color:#F0E5DB}
+body:not(.landing-mode) #view .match-item{border-color:rgba(240,229,219,.15)}
+body:not(.landing-mode) #view .studio-main{background:rgba(240,229,219,.055)}
+body:not(.landing-mode) #view .studio-status{
+ display:flex;justify-content:flex-start;align-items:center;gap:10px;margin:8px 0 27px
+}
+body:not(.landing-mode) #view .studio-status .pill{padding:9px 14px}
+body:not(.landing-mode) #view .studio-main h2{font-size:clamp(25px,2.6vw,35px)}
+body:not(.landing-mode) #view .studio-main textarea{
+ border-color:rgba(240,229,219,.22);background:rgba(20,23,16,.35);color:#F0E5DB;
+ padding:17px 19px;margin:18px 0 7px
+}
+body:not(.landing-mode) #view .studio-toggle{color:#d2c8b7}
+body:not(.landing-mode) #view .studio-toggle input{accent-color:#F0E5DB}
+body:not(.landing-mode) #view .studio-metrics>div{border-color:rgba(240,229,219,.16)}
+body:not(.landing-mode) #view .studio-metrics strong{color:#F0E5DB}
+body:not(.landing-mode) #view .studio-metrics small{color:#bdb29f}
+body:not(.landing-mode) #view .studio-progress{background:rgba(240,229,219,.12)}
+body:not(.landing-mode) #view .studio-progress>div{background:#F0E5DB}
+body:not(.landing-mode) #view .studio-selected{
+ background:rgba(240,229,219,.08);border:1px solid rgba(240,229,219,.16);
+ color:#F0E5DB
+}
+body:not(.landing-mode) #view .studio-selected a{color:#F0E5DB}
+body:not(.landing-mode) #view .studio-selected span{color:#e3c5a1}
+body:not(.landing-mode) #view .studio-option{border-color:rgba(240,229,219,.16)}
+body:not(.landing-mode) #view .studio-error{color:#ecb4a7}
+body:not(.landing-mode) #view .compact-summary{color:#b9b09f}
+body:not(.landing-mode) #view .compact-summary b{color:#F0E5DB}
+body:not(.landing-mode) #view .compact-list,
+body:not(.landing-mode) #view .compact-track{border-color:rgba(240,229,219,.15)}
+body:not(.landing-mode) #view .compact-col-head{color:#b9b09e;letter-spacing:1.3px}
+body:not(.landing-mode) #view .compact-track{padding:17px 8px;transition:background .2s ease}
+body:not(.landing-mode) #view .compact-track:hover{background:rgba(240,229,219,.052)}
+body:not(.landing-mode) #view .compact-name strong{color:#F0E5DB;font-size:14px}
+body:not(.landing-mode) #view .compact-name small{color:#b9b09f}
+body:not(.landing-mode) #view .compact-options{
+ background:rgba(240,229,219,.055);border:1px solid rgba(240,229,219,.16);color:#F0E5DB
+}
+body:not(.landing-mode) #view .compact-option{border-color:rgba(240,229,219,.14)}
+body:not(.landing-mode) #view .compact-option small{color:#afa795}
+body:not(.landing-mode) #view .compact-check{
+ appearance:none;-webkit-appearance:none;display:block;width:19px;height:19px;
+ background:transparent;border:1px solid rgba(240,229,219,.65);border-radius:4px;position:relative
+}
+body:not(.landing-mode) #view .compact-check:checked{background:#F0E5DB;border-color:#F0E5DB}
+body:not(.landing-mode) #view .compact-check:checked:after{color:#474329}
+body:not(.landing-mode) #view .studio-info-btn{
+ background:rgba(240,229,219,.11);border-color:rgba(240,229,219,.35);color:#F0E5DB
+}
+body:not(.landing-mode) .studio-overlay{
+ background:rgba(9,11,7,.83);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)
+}
+body:not(.landing-mode) .studio-dialog{
+ background:#34362a;border:1px solid rgba(240,229,219,.27);
+ color:#F0E5DB;border-radius:13px;box-shadow:0 35px 110px rgba(0,0,0,.42)
+}
+body:not(.landing-mode) .studio-dialog h2,
+body:not(.landing-mode) .studio-dialog label{color:#F0E5DB}
+body:not(.landing-mode) .studio-dialog p{color:#c7bdab}
+body:not(.landing-mode) .studio-dialog .field{
+ background:rgba(15,18,12,.3);border:1px solid rgba(240,229,219,.25);
+ color:#F0E5DB
+}
+body:not(.landing-mode) .studio-dialog .field::placeholder{color:#a69d8a}
+body:not(.landing-mode) .studio-dialog .btn{
+ background:rgba(240,229,219,.09);color:#F0E5DB;border:1px solid rgba(240,229,219,.28);
+ border-radius:6px
+}
+body:not(.landing-mode) .studio-dialog .btn.primary{
+ background:#F0E5DB;color:#474329;border-color:#F0E5DB
+}
+body:not(.landing-mode) .studio-close{color:#F0E5DB}
+body:not(.landing-mode) .studio-export-success{color:#F0E5DB}
+body:not(.landing-mode) .studio-export-success a{color:#f2dfc1}
+body:not(.landing-mode) #toast{
+ position:fixed;z-index:1400;background:#F0E5DB;border:1px solid rgba(71,67,41,.25);
+ color:#474329;border-radius:7px;box-shadow:0 18px 45px rgba(0,0,0,.32)
+}
+
+/* The app hero becomes useful and compact, with landing-style grid/glow. */
+body:not(.landing-mode) #view .flow-hero{
+ isolation:isolate;min-height:340px;height:auto;margin:0 0 32px;
+ padding:25px clamp(20px,3.4vw,45px);
+ background:
+  radial-gradient(ellipse 42% 65% at 76% 90%,rgba(240,229,219,.24),transparent 80%),
+  radial-gradient(ellipse 52% 80% at 95% 20%,rgba(145,130,96,.14),transparent 80%),
+  linear-gradient(115deg,#313328 3%,#474329 58%,#292c21 100%);
+ border:1px solid rgba(240,229,219,.18);
+ border-radius:12px;overflow:hidden;box-shadow:0 24px 65px rgba(7,9,5,.12)
+}
+body:not(.landing-mode) #view .flow-hero:before{
+ content:"";position:absolute;inset:0;pointer-events:none;opacity:.26;
+ background-image:linear-gradient(to right,rgba(240,229,219,.18) 1px,transparent 1px),
+ linear-gradient(to bottom,rgba(240,229,219,.18) 1px,transparent 1px);
+ background-size:75px 75px;mask-image:linear-gradient(to right,black 20%,transparent 100%);
+}
+body:not(.landing-mode) #view .flow-hero:after{box-shadow:none}
+body:not(.landing-mode) #view .flow-hero-top,
+body:not(.landing-mode) #view .flow-hero-bottom{
+ position:relative;z-index:6;color:#d8cfbc;letter-spacing:1.7px;
+ font:800 9px 'DM Sans',sans-serif;border-color:rgba(240,229,219,.19)
+}
+body:not(.landing-mode) #view .flow-hero-stage{
+ position:relative;display:flex;align-items:flex-start;justify-content:center;min-height:244px;
+ padding:16px 0;flex-direction:column
+}
+body:not(.landing-mode) #view .flow-hero-copy{
+ position:relative;z-index:4;text-align:left;padding:0;max-width:min(70%,790px)
+}
+body:not(.landing-mode) #view .flow-kicker{
+ color:#d9cfba;font:800 10px 'DM Sans',sans-serif;letter-spacing:2.6px;margin:0 0 16px
+}
+body:not(.landing-mode) #view .flow-hero-copy h1{
+ font:600 clamp(42px,5.3vw,77px)/.98 'Space Grotesk',sans-serif;
+ letter-spacing:-.079em;color:#F0E5DB;margin:0;text-transform:none
+}
+body:not(.landing-mode) #view .flow-hero-copy h1 .flow-dot{color:#c1a988}
+body:not(.landing-mode) #view .flow-hero-copy p{
+ color:#cfc6b2;text-align:left;font-size:13px;margin:19px 0 0
+}
+body:not(.landing-mode) #view .flow-orbit{
+ position:absolute;z-index:3;left:auto;right:6%;bottom:0;transform:none;
+ width:clamp(155px,19vw,260px);height:clamp(155px,19vw,260px);
+ filter:drop-shadow(0 20px 34px rgba(0,0,0,.31))
+}
+body:not(.landing-mode) #view .flow-orbit-ring{border-color:rgba(240,229,219,.3)}
+body:not(.landing-mode) #view .flow-core{
+ background:radial-gradient(circle at 24% 18%,#f8e9d9 0%,#b4a88e 19%,#726b4c 41%,#474329 75%,#22261c 100%)
+}
+body:not(.landing-mode) #view .flow-float{display:none}
+body:not(.landing-mode) #view .flow-ambient{display:none}
+body:not(.landing-mode) #view .flow-workspace-heading{
+ text-align:left;padding:10px 0 22px
+}
+body:not(.landing-mode) #view .flow-workspace-heading>span{
+ color:#c2b7a1;font:800 10px 'DM Sans',sans-serif;letter-spacing:2px
+}
+body:not(.landing-mode) #view .flow-workspace-heading h2{
+ color:#F0E5DB;font:600 clamp(36px,4.2vw,62px)/1 'Space Grotesk',sans-serif;
+ letter-spacing:-.07em;margin:13px 0 10px
+}
+body:not(.landing-mode) #view .flow-workspace-heading h2 span{color:#b59b7a}
+body:not(.landing-mode) #view .flow-workspace-heading p{font-size:13px;color:#c0b4a2}
+body:not(.landing-mode) #view .flow-import-panel{
+ background:linear-gradient(115deg,rgba(240,229,219,.092),rgba(240,229,219,.045))
+}
+body:not(.landing-mode) #view .flow-tracks-panel{
+ background:rgba(240,229,219,.045)
+}
+body:not(.landing-mode) #view .studio-select-all{margin:9px 0 17px}
+
+@media(max-width:1130px){
+ body:not(.landing-mode) .shell>aside{padding:0 20px;gap:12px}
+ body:not(.landing-mode) .shell>aside .logo{font-size:19px}
+ body:not(.landing-mode) .shell>aside .logo small{font-size:7px}
+ body:not(.landing-mode) .shell>aside nav button{font-size:9px;padding:11px 8px}
+ body:not(.landing-mode) #view .flow-hero-copy{max-width:72%}
+}
+@media(max-width:900px){
+ body:not(.landing-mode) .shell>aside{height:auto;min-height:80px;align-items:flex-start;flex-direction:column;justify-content:center;padding:17px 20px 10px;gap:14px}
+ body:not(.landing-mode) .shell>aside nav{width:100%;margin:0;justify-content:flex-start;overflow-x:auto}
+ body:not(.landing-mode) .shell>aside nav button{font-size:10px;padding:10px 11px}
+ body:not(.landing-mode) main>header{height:40px;padding:0 20px}
+ body:not(.landing-mode) #view{padding:14px 20px 75px}
+ body:not(.landing-mode) #view .flow-hero{min-height:330px}
+ body:not(.landing-mode) #view .flow-hero-stage{min-height:240px}
+ body:not(.landing-mode) #view .flow-hero-copy h1{font-size:clamp(42px,7vw,64px)}
+ body:not(.landing-mode) #view .flow-orbit{right:3%;width:200px;height:200px}
+}
+@media(max-width:600px){
+ body:not(.landing-mode) .shell>aside .logo{font-size:19px}
+ body:not(.landing-mode) .shell>aside nav button{font-size:10px!important;padding:9px 10px}
+ body:not(.landing-mode) .shell>aside nav button::first-letter{font-size:inherit}
+ body:not(.landing-mode) main>header{height:34px;padding:0 16px}
+ body:not(.landing-mode) main>header .user{display:none}
+ body:not(.landing-mode) #view{padding:14px 15px 64px}
+ body:not(.landing-mode) #view .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ body:not(.landing-mode) #view .columns{grid-template-columns:minmax(0,1fr)}
+ body:not(.landing-mode) #view .panel{padding:18px}
+ body:not(.landing-mode) #view h1{font-size:clamp(35px,9vw,48px)}
+ body:not(.landing-mode) #view .flow-hero{min-height:280px;padding:19px;margin-bottom:20px}
+ body:not(.landing-mode) #view .flow-hero-top,
+ body:not(.landing-mode) #view .flow-hero-bottom{font-size:8px;letter-spacing:1px}
+ body:not(.landing-mode) #view .flow-hero-stage{min-height:212px;padding:18px 0}
+ body:not(.landing-mode) #view .flow-kicker{font-size:8px;letter-spacing:1.5px}
+ body:not(.landing-mode) #view .flow-hero-copy{max-width:100%}
+ body:not(.landing-mode) #view .flow-hero-copy h1{font-size:clamp(40px,10vw,60px)}
+ body:not(.landing-mode) #view .flow-hero-copy p{max-width:260px;font-size:11px}
+ body:not(.landing-mode) #view .flow-orbit{right:-25%;bottom:5%;opacity:.15;width:210px;height:210px}
+ body:not(.landing-mode) #view .flow-workspace-heading h2{font-size:39px}
+ body:not(.landing-mode) #view .flow-workspace-heading p{font-size:12px}
+ body:not(.landing-mode) #view .studio-status{gap:7px;margin-bottom:17px}
+ body:not(.landing-mode) #view .studio-status .pill{font-size:9px;padding:7px 9px}
+ body:not(.landing-mode) #view .studio-main .compact-header>.row{width:100%;justify-content:flex-start}
+ body:not(.landing-mode) #view .studio-main .compact-header>.row .btn{min-width:0;flex:1}
+ body:not(.landing-mode) #view .compact-col-head{display:none}
+ body:not(.landing-mode) #view .compact-track{grid-template-columns:24px minmax(0,1fr);gap:8px}
+ body:not(.landing-mode) #view .compact-check{grid-column:1;grid-row:1/3}
+ body:not(.landing-mode) #view .compact-name{grid-column:2;grid-row:1}
+ body:not(.landing-mode) #view .compact-status{grid-column:2;grid-row:2}
+ body:not(.landing-mode) #view .compact-options{grid-column:2/3}
+ body:not(.landing-mode) #view .studio-main textarea{font-size:13px;padding:14px}
+ body:not(.landing-mode) .studio-dialog{padding:23px 20px}
+}
+@media(prefers-reduced-motion:reduce){
+ body:not(.landing-mode) #view .flow-core{animation:none}
+ body:not(.landing-mode) #view .btn{transition:none}
+}
