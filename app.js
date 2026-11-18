@@ -41,7 +41,7 @@ async function lookupQueue(){
  if(catalogSearchBusy)return toast('A catalog lookup is already running');
  const pending=state.tracks.filter(t=>t.status==='pending'&&!t.match?.url&&!t.catalog?.checkedAt).slice(0,5);
  if(!pending.length)return toast('No unchecked pending tracks in the first batch');
- if(!confirm('Search MusicAPI for '+pending.length+' track(s)? This may count towards your API usage.'))return;
+ if(!confirm('Search Beatport through MusicAPI for '+pending.length+' track(s)? This may count towards your API usage.'))return;
  catalogSearchBusy=true;let ok=0,fail=0;
  try{for(const t of pending){try{await searchCatalogTrack(t);ok++}catch(e){fail++;logSync(t,'Catalog error',String(e.message||e).slice(0,120))}}}
  finally{catalogSearchBusy=false;render();toast(ok+' catalog searches completed'+(fail?' · '+fail+' errors':''))}
@@ -57,7 +57,7 @@ function matchView(){
 const needs=state.tracks.filter(t=>!['owned','downloaded'].includes(t.status)),matched=needs.filter(t=>t.match?.url),done=state.syncHistory.length;
 return head('03 / SOURCE','Match & Sync','Review Beatport candidates, compare mix versions, and track what was actually added. No store cart action is automated yet.')+
 '<div class="grid">'+card('TO REVIEW',needs.filter(t=>!t.match?.url).length,'Tracks without an approved candidate')+card('MATCHED',matched.length,'Beatport links saved')+card('MARKED IN CART',needs.filter(t=>t.status==='cart').length,'Manually confirmed')+card('SYNC EVENTS',done,'Local activity history')+'</div>'+
-'<div class="panel"><h2>Matching preferences</h2><label><input type="checkbox" id="preferExtended" '+(state.settings.preferExtended?'checked':'')+'> Prefer Extended Mix when comparing candidates</label><p class="note">Search results come from MusicAPI when available. Scores are local estimates, not guaranteed exact matches. Always confirm the artist and mix before approving; no automatic cart action occurs.</p><div class="row"><button class="btn primary" id="catalogBatch">SEARCH NEXT 5 VIA MUSICAPI</button><button class="btn" id="searchFirstMatch">OPEN BEATPORT SEARCH</button><button class="btn" id="downloadHistory">EXPORT SYNC HISTORY</button></div></div>'+
+'<div class="panel"><h2>Matching preferences</h2><label><input type="checkbox" id="preferExtended" '+(state.settings.preferExtended?'checked':'')+'> Prefer Extended Mix when comparing candidates</label><p class="note">Searches use your verified Beatport connection through MusicAPI. If you connected before this update, reconnect Beatport once to activate the secure session. Scores are local estimates, not guaranteed exact matches. Always confirm the artist and mix before approving; no automatic cart action occurs.</p><div class="row"><button class="btn primary" id="catalogBatch">SEARCH NEXT 5 ON BEATPORT</button><button class="btn" id="searchFirstMatch">OPEN BEATPORT SEARCH</button><button class="btn" id="downloadHistory">EXPORT SYNC HISTORY</button></div></div>'+
 '<div class="panel gap"><h2>Track matching queue</h2>'+(needs.length?needs.map(t=>{
 const m=t.match||{},score=m.score??null;
 return '<div class="match-item"><div class="row" style="justify-content:space-between"><div><strong>'+esc(t.title)+'</strong><p style="margin:4px 0">'+esc(t.artist)+' · '+esc(t.remix||'Version not specified')+'</p></div><span class="pill '+(t.status==='cart'?'cart':'pending')+'">'+esc(t.status)+'</span></div>'+
