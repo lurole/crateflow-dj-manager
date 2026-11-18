@@ -28,13 +28,20 @@ export default async function handler(req,res){
     const value=await response.json();
     const actualStatus=value?.authModel?.status;
     const actualId=value?.integrationUser?.uuid;
-    const service=value?.integrationUser?.integrationType||value?.integrationUser?.type||value?.integration?.type;
     if(actualStatus!=='success'||actualId!==claimedUser)return res.status(403).json({ok:false,error:'Callback does not match verified MusicAPI sign-in'});
-    // The public API response does not consistently supply the service type.
-    // The authenticated attempt is verified, but do not claim the service is
-    // Beatport without an explicit service type.
-    if(service&&String(service).toLowerCase()!=='beatport')return res.status(403).json({ok:false,error:'Verified service is not Beatport'});
-    return res.status(200).json({ok:true,verified:true,serviceVerified:!!service,service:service||null,verifiedAt:new Date().toISOString()});
+    // Query the connected-user endpoint to verify the actual service.
+    const userResponse=await fetch('https://api.musicapi.com/public/integrations/user/'+encodeURIComponent(actualId),{
+      method:'GET',
+      headers:{Authorization:'Basic '+Buffer.from(clientId+':'+secret).toString('base64'),Accept:'application/json'},
+      signal:controller.signal
+    });
+    if(!userResponse.ok)return res.status(502).json({ok:false,error:'MusicAPI connected-user lookup failed',providerStatus:userResponse.status});
+    const user=await userResponse.json();
+    if(user?.integrationUser?.uuid!==actualId)return res.status(403).json({ok:false,error:'Connected-user identity mismatch'});
+    const service=user?.integration?.type;
+    if(typeof service!=='string'||service.toLowerCase()!=='beatport')return res.status(403).json({ok:false,error:'Connected service was not confirmed as Beatport'});
+    // Never return credentials or private profile fields.
+    return res.status(200).json({ok:true,verified:true,serviceVerified:true,service:'beatport',verifiedAt:new Date().toISOString()});
   }catch{return res.status(502).json({ok:false,error:'Unable to contact MusicAPI verification endpoint'});}
   finally{clearTimeout(timer);}
 }
