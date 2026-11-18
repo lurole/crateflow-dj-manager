@@ -50,18 +50,39 @@ export default async function handler(req,res){
     }
     // The connected-user API is separate from public catalog search.
     // Never interpret an unrecognized 200 payload as a genuine catalog miss.
-    const envelope=Array.isArray(data)?data:
-      Array.isArray(data?.tracks)?data.tracks:
-      Array.isArray(data?.items)?data.items:
-      Array.isArray(data?.results)?data.results:
-      Array.isArray(data?.data?.tracks)?data.data.tracks:
-      Array.isArray(data?.data?.items)?data.data.items:
-      Array.isArray(data?.data?.results)?data.data.results:
-      null;
-    const declaredEmpty=data?.status==='not_found'||data?.status==='notFound'||data?.status==='empty'||data?.found===false;
+    // Search endpoints can return either a plain list or a wrapped collection.
+    // Inspect only the shallow search/result branches; never expose provider values.
+    const collections=[
+      ['root',data],['tracks',data?.tracks],['items',data?.items],['results',data?.results],
+      ['data',data?.data],['data.tracks',data?.data?.tracks],['data.items',data?.data?.items],
+      ['data.results',data?.data?.results],['data.searchResults',data?.data?.searchResults],
+      ['searchResults',data?.searchResults],['result',data?.result],
+      ['result.tracks',data?.result?.tracks],['result.items',data?.result?.items],
+      ['result.results',data?.result?.results],['data.data',data?.data?.data],
+      ['data.data.results',data?.data?.data?.results],['data.results.items',data?.data?.results?.items],
+      ['data.results.tracks',data?.data?.results?.tracks],
+    ];
+    let envelope=null,chosenPath=null;
+    for(const [path,value] of collections){
+      if(Array.isArray(value)){envelope=value;chosenPath=path;break}
+    }
+    if(!envelope){
+      const one=data?.data?.track||data?.track||data?.result?.track||data?.data?.result;
+      if(one&&typeof one==='object'&&!Array.isArray(one)&&(one.name||one.title)){envelope=[one];chosenPath='single track'}
+    }
+    const declaredEmpty=['not_found','notFound','empty'].includes(data?.status)||data?.found===false;
     if(!envelope&&!declaredEmpty){
-      const responseFields=data&&typeof data==='object'?Object.keys(data).filter(k=>/^[a-zA-Z][a-zA-Z0-9_]{0,39}$/.test(k)).slice(0,12):[];
-      return res.status(502).json({ok:false,error:'Unexpected MusicAPI search response. The track has not been classified as not found.',diagnostic:'unrecognized_response',responseFields});
+      const safeKeys=value=>value&&typeof value==='object'&&!Array.isArray(value)
+        ?Object.keys(value).filter(k=>/^[a-zA-Z][a-zA-Z0-9_]{0,39}$/.test(k)&&!/auth|token|secret|email|password|cookie|user|session|profile|credential|key/i.test(k)).slice(0,12)
+        :[];
+      return res.status(502).json({
+        ok:false,error:'MusicAPI search result format not recognized; no tracks have been marked as missing.',
+        diagnostic:'unrecognized_response',
+        responseFields:safeKeys(data),
+        dataFields:safeKeys(data?.data),
+        resultFields:safeKeys(data?.result),
+        providerResultStatus:typeof data?.status==='string'?data.status.slice(0,30):null
+      });
     }
     const raw=envelope||[];
     const candidates=raw.slice(0,8).map(item=>{
@@ -76,7 +97,7 @@ export default async function handler(req,res){
     if(raw.length>0&&!candidates.length){
       return res.status(502).json({ok:false,error:'MusicAPI returned records, but CRATEFLOW could not read their track fields.',diagnostic:'unrecognized_tracks',recordCount:raw.length});
     }
-    return res.status(200).json({ok:true,status:candidates.length?'success':'not_found',candidates});
+    return res.status(200).json({ok:true,status:candidates.length?'success':declaredEmpty?'not_found':raw.length===0?'not_found':'unreadable_tracks',candidates});
 
   }catch{return res.status(502).json({ok:false,error:'Beatport search timed out or failed'});}
   finally{clearTimeout(timeout);}
