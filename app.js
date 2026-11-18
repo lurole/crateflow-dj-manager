@@ -1,7 +1,7 @@
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const storage='crateflow_v1',defaults={tracks:[],playlists:[],settings:{spotifyClientId:'9cf21ad1b0b8483681d12bdb9daeb42f'}};
 let state;try{state={...defaults,...JSON.parse(localStorage.getItem(storage)||'{}')}}catch{state=structuredClone(defaults)}
-state.settings={...defaults.settings,preferExtended:true,...state.settings,musicApiSlug:'tracky'};state.syncHistory=Array.isArray(state.syncHistory)?state.syncHistory:[];
+state.settings={...defaults.settings,preferExtended:true,...state.settings,musicApiSlug:'tracky'};for(const t of state.tracks||[]){if(t.studioResult==='missing_url'&&t.studioCandidate?.externalId&&t.studioCandidate?.score===100)t.studioResult='id_ready';}state.syncHistory=Array.isArray(state.syncHistory)?state.syncHistory:[];
 let page=localStorage.getItem('crateflow_onboarded')==='yes'?'overview':'welcome',search='',filter='all',playlistFilter='all';
 const persist=()=>localStorage.setItem(storage,JSON.stringify(state)),uid=()=>crypto.randomUUID(),trackStats=()=>({total:state.tracks.length,pending:state.tracks.filter(t=>t.status==='pending').length,cart:state.tracks.filter(t=>t.status==='cart').length,owned:state.tracks.filter(t=>t.status==='owned').length,downloaded:state.tracks.filter(t=>t.status==='downloaded').length});
 function toast(s){let t=$('#toast');t.textContent=s;t.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove('show'),4000)}
