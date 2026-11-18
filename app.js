@@ -62,13 +62,14 @@ window.addEventListener('message',event=>{
  if(event.data.type==='JOB_QUEUED'){studioCompanionStatus='Transfer prepared in browser companion';toast('Cart handoff prepared in browser extension');return}
  if(event.data.type==='JOB_ERROR'){studioCompanionStatus='Browser companion handoff failed';toast(studioCompanionStatus)}
 });
+window.postMessage({source:'crateflow-app',type:'PING',version:1},location.origin);
 function studioOpenCartHandoff(){
  if(!studioExportResult||studioExportResult.mode!=='cart')return toast('Prepare a Beatport cart playlist first');
  const record=studioExportResult;
  const nonce=Date.now().toString(36)+Math.random().toString(36).slice(2)+Math.random().toString(36).slice(2);
  const job={source:'crateflow-app',type:'QUEUE_PLAYLIST',version:1,nonce,name:record.name,playlistId:String(record.playlistId),count:Number(record.added)};
  studioCompanionStatus=studioCompanionReady?'Sending playlist to browser companion':'No companion detected: open the playlist and choose Buy All manually';
- if(studioCompanionReady)window.postMessage(job,location.origin);
+ window.postMessage(job,location.origin);
  window.open('https://www.beatport.com/','_blank','noopener');
  toast(studioCompanionReady?'Open your playlist on Beatport; the assistant will guide you.':'Open your playlist on Beatport and use Buy All. Install the optional companion for assistance.');
 }
