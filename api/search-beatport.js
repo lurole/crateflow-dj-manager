@@ -91,8 +91,12 @@ export default async function handler(req,res){
         Array.isArray(d?.artists)?d.artists.map(a=>typeof a==='string'?a:a?.name):
         typeof d?.artist==='string'?[d.artist]:[];
       const name=String(d?.name||d?.title||d?.trackName||'').slice(0,220);
-      const url=String(d?.url||d?.externalUrl||d?.shareUrl||'');
-      return {name,artist:artists.filter(Boolean).join(', ').slice(0,250),url:/^https:\/\/(www\.)?beatport\.com\/track\//.test(url)?url:null,externalId:String(d?.externalId||d?.id||'').slice(0,80),isrc:String(d?.isrc||'').slice(0,40),mixHint:/extended/i.test(name)?'Extended Mix':/radio/i.test(name)?'Radio Edit':/original/i.test(name)?'Original Mix':'Unspecified'};
+      const url=String(d?.url||d?.externalUrl||d?.shareUrl||d?.links?.beatport||d?.external_urls?.beatport||'');
+      // MusicAPI playlist item IDs and Beatport store track IDs may differ.
+      // Preserve externalId for playlists; expose only a numeric store ID for cart automation.
+      const idOptions=[d?.beatportId,d?.beatportTrackId,d?.beatport_id,d?.trackId,d?.externalId,d?.id];
+      const beatportId=idOptions.map(x=>String(x??'')).find(x=>/^\d{1,12}$/.test(x))||null;
+      return {name,artist:artists.filter(Boolean).join(', ').slice(0,250),url:/^https:\/\/(www\.)?beatport\.com\/track\//.test(url)?url:null,externalId:String(d?.externalId||d?.id||'').slice(0,80),beatportId,isrc:String(d?.isrc||'').slice(0,40),mixHint:/extended/i.test(name)?'Extended Mix':/radio/i.test(name)?'Radio Edit':/original/i.test(name)?'Original Mix':'Unspecified'};
     }).filter(c=>c.name);
     if(raw.length>0&&!candidates.length){
       return res.status(502).json({ok:false,error:'MusicAPI returned records, but CRATEFLOW could not read their track fields.',diagnostic:'unrecognized_tracks',recordCount:raw.length});
