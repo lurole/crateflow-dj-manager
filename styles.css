@@ -109,3 +109,8 @@ textarea.field{display:block;resize:vertical;min-height:110px}
  .compact-action{grid-column:2;grid-row:1/3}
  .compact-options{grid-column:1/3}
 }
+
+/* Distinct Beatport handoff actions */
+.compact-header>.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+#studioCart,#studioExport{white-space:normal;text-align:center}
+@media(max-width:700px){.compact-header>.row{width:100%}.compact-header>.row .btn{flex:1;min-width:145px}}
