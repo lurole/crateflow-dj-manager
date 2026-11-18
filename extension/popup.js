@@ -1,26 +1,17 @@
-// Optional popup for the cross-browser Beatport companion.
-// Cart action is performed only by the verified playlist's on-page confirmation.
+// Read-only status; direct cart sync is initiated with one click in CRATEFLOW.
 const api=typeof browser!=='undefined'?browser:chrome;
 const button=document.getElementById('run'),result=document.getElementById('result');
-async function status(){
+async function update(){
  try{
-  const job=(await api.storage.local.get('crateflowCartJob')).crateflowCartJob;
-  if(!job||Date.now()-job.createdAt>20*60*1000){
-   result.textContent='No active CRATEFLOW cart handoff. Use Send to Cart in the web app first.';
-   button.disabled=true;
-   return;
-  }
-  if(job.status==='click_sent'){
-   result.textContent='Buy All click sent for “'+job.name+'”. Check your Beatport cart.';
-   button.disabled=true;
-   return;
-  }
-  result.textContent='Waiting for playlist “'+job.name+'” ('+job.count+' tracks). Open it on Beatport; use the CRATEFLOW on-page confirmation.';
- }catch{result.textContent='Unable to read cart handoff.';button.disabled=true}
+  const job=(await api.storage.local.get('crateflowDirectCartJob')).crateflowDirectCartJob;
+  if(!job){result.textContent='No direct cart job yet. Click Send to Cart in CRATEFLOW.';return}
+  result.textContent='Direct cart: '+job.done+'/'+job.tracks.length+' processed. '+job.clicked+' clicks / already in cart, '+job.failed+' failed. '+(job.status==='done'?'Review your Beatport cart.':'Status: '+job.status+'.');
+ }catch{result.textContent='Could not read cart status.'}
 }
-button.textContent='Open Beatport';
+button.textContent='Open Beatport Cart';
 button.addEventListener('click',async()=>{
- try{await api.tabs.create({url:'https://www.beatport.com/'})}
- catch(error){result.textContent=error?.message||'Could not open Beatport'}
+ try{await api.tabs.create({url:'https://www.beatport.com/cart'})}
+ catch(error){result.textContent=error?.message||'Unable to open Beatport'}
 });
-status();
+api.storage.onChanged.addListener((changes,area)=>{if(area==='local'&&changes.crateflowDirectCartJob)update()});
+update();
