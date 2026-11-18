@@ -32,7 +32,29 @@ export default async function handler(req,res){
       signal:controller.signal
     });
     const data=await response.json().catch(()=>({}));
-    if(!response.ok)return res.status(502).json({ok:false,error:'MusicAPI search unavailable',providerStatus:response.status});
+    if(!response.ok){
+      const providerCode=typeof data?.internalCode==='number'?data.internalCode:null;
+      const providerMessage=String(data?.message||data?.error||'').slice(0,140);
+      let support='unknown';
+      try{
+        const metaResponse=await fetch('https://api.musicapi.com/public/search/introspection',{
+          headers:{Authorization:'Token '+clientId,Accept:'application/json'},
+          signal:controller.signal
+        });
+        if(metaResponse.ok){
+          const meta=await metaResponse.json();
+          if(Array.isArray(meta.sources))support=meta.sources.includes('beatport')?'available':'not_supported';
+        }
+      }catch{/* Diagnostic lookup is optional. */}
+      const reason=support==='not_supported'
+        ?'Beatport is not supported by MusicAPI public catalog search for this account. A connected-user search needs separate secure integration.'
+        :response.status===401||response.status===403
+        ?'MusicAPI refused catalog authorization. Check the Client ID and catalog permissions.'
+        :response.status===429
+        ?'MusicAPI rate limit exceeded. Retry later.'
+        :'MusicAPI catalog search failed. Check the provider status and supported sources.';
+      return res.status(502).json({ok:false,error:reason,providerStatus:response.status,providerCode,providerMessage,catalogSupport:support});
+    }
     const matches=Array.isArray(data.tracks)?data.tracks.filter(t=>t.source==='beatport'):[];
     const candidates=matches.filter(t=>t.status==='success'&&t.data).slice(0,5).map(t=>{
       const d=t.data;
