@@ -74,7 +74,7 @@ export default async function handler(req,res){
     requested:unique.length,added:0,unverified:unique,
     warning:'Beatport accepted the playlist request, but its contents could not be verified. Check the playlist before retrying.',cartUpdated:false});
   }
-  const notUsed=new Set(actual.map((_,i)=>i)),confirmed=[],missing=[],mismatched=[];
+  const notUsed=new Set(actual.map((_,i)=>i)),confirmed=[],missing=[],mismatched=[],unavailable=[],availabilityUnknown=[];
   for(let i=0;i<unique.length;i++){
    const id=unique[i],request=submitted?.[i];
    // Prefer the exact Beatport catalog ID. Fall back only to a matching ISRC,
@@ -112,14 +112,17 @@ export default async function handler(req,res){
      // an artist mismatch or a conflicting recording identifier.
      identityOK=assessment.autoEligible;
     }else identityOK=false;
-    if(identityOK)confirmed.push(id);
-    else mismatched.push(id);
+    if(item?.isAvailable===false)unavailable.push(id);
+    else if(identityOK){
+     confirmed.push(id);
+     if(item?.isAvailable!==true)availabilityUnknown.push(id);
+    }else mismatched.push(id);
    }else missing.push(id);
   }
   return res.status(200).json({ok:true,verified:true,playlistId:String(playlistId),
    name:title,requested:unique.length,added:confirmed.length,confirmed,
-   missing,mismatched,cartUpdated:false,
-   warning:missing.length||mismatched.length?'Some requested tracks were missing or inconsistent after read-back.':null});
+   missing,mismatched,unavailable,availabilityUnknown,cartUpdated:false,
+   warning:missing.length||mismatched.length||unavailable.length?'Some requested tracks were missing, unavailable or inconsistent after read-back.':availabilityUnknown.length?'Playlist membership verified, but playback/purchase availability was not explicitly confirmed for all tracks.':null});
  }catch{return res.status(502).json({ok:false,error:'MusicAPI playlist export failed or timed out. Check Beatport for a partial playlist before retrying'});}
  finally{clearTimeout(timer)}
 }
