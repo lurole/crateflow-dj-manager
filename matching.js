@@ -12,7 +12,21 @@
     if(!A.size||!B.size)return 0;
     return 2*[...A].filter(x=>B.has(x)).length/(A.size+B.size);
   };
-  const artistName=s=>words(s).replace(/\b(and|feat|ft|featuring|with|vs)\b/g," ").replace(/\s+/g," ").trim();
+  const artistName=s=>words(s).replace(/\\b(and|feat|ft|featuring|with|vs)\\b/g," ").replace(/\\s+/g," ").trim();
+  // Streaming services sometimes credit just the principal artist whereas Beatport
+  // lists all credited collaborators. Compare complete artist identities, not
+  // the whole joined credit string nor substrings (e.g. "Ann" vs "Anna").
+  const splitArtists=(s,structured)=>{
+    const value=Array.isArray(structured)&&structured.length?structured:String(s||"").split(/[,;]+|\\s+(?:&|feat\\.?|ft\\.?|featuring|with|vs\\.?)\\s+/i);
+    return [...new Set(value.map(v=>artistName(v)).filter(v=>v&&v!=="unknown artist"))];
+  };
+  const compareArtists=(track,candidate)=>{
+    const input=splitArtists(track?.artist,track?.artistNames);
+    const found=splitArtists(candidate?.artist,candidate?.artistNames);
+    const allIncluded=Boolean(input.length&&found.length&&input.every(v=>found.includes(v)));
+    const equal=allIncluded&&input.length===found.length;
+    return {exact:equal,allIncluded,extra:allIncluded&&!equal,input,found};
+  };
   const isVersion=s=>/\b(original|extended|radio|club|dub|instrumental|acoustic|remix|remixed|rework|bootleg|vip|live|edit|mix|remaster|remastered|version)\b/i.test(s);
   const versionInfo=s=>{
     const text=words(s);
@@ -78,8 +92,10 @@
   const assess=(track,candidate,preferExtended=true)=>{
     const title=titleCore(track?.title),otherTitle=titleCore(candidate?.name);
     const artist=artistName(track?.artist),otherArtist=artistName(candidate?.artist);
+    const artistComparison=compareArtists(track,candidate);
     const titleExact=Boolean(title&&title===otherTitle);
-    const artistExact=Boolean(artist&&artist!=="unknown artist"&&artist===otherArtist);
+    const artistExact=artistComparison.allIncluded;
+    const artistCreditsExact=artistComparison.exact;
     const req=sourceVersion(track),found=candidateVersion(candidate);
     const versionOK=versionMatch(req,found);
     const leftISRC=String(track?.isrc||"").replace(/[^a-z0-9]/gi,"").toUpperCase();
@@ -99,6 +115,7 @@
     const reasons=[];
     if(!titleExact)reasons.push("Title differs");
     if(!artistExact)reasons.push("Artist differs");
+    else if(!artistCreditsExact)reasons.push("Principal artist matches; Beatport has additional credits");
     if(!versionOK)reasons.push("Different mix/version");
     if(isrcConflict)reasons.push("ISRC differs");
     if(!candidate?.externalId)reasons.push("Beatport playlist ID unavailable");
@@ -106,7 +123,7 @@
     const preferred=req.kind==="unspecified"?
       (preferExtended?found.kind==="extended":found.kind==="original"):false;
     const rank=score+(isrcMatch?7:0)+(preferred?3:0)+(candidate?.externalId?1:0);
-    return {score,rank,autoEligible,titleExact,artistExact,versionOK,isrcMatch,isrcConflict,
+    return {score,rank,autoEligible,titleExact,artistExact,artistCreditsExact,additionalArtistCredits:artistComparison.extra,versionOK,isrcMatch,isrcConflict,
       sourceVersion:versionLabel(req),candidateVersion:versionLabel(found),versionKind:found.kind,
       reason:reasons[0],reasons};
   };
