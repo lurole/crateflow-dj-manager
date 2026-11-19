@@ -436,7 +436,7 @@ function mixView(){
  const compatible=tracks.filter(t=>globalThis.CrateflowMix.parseKey(t.key)&&globalThis.CrateflowMix.bpmValue(t.bpm));
  const current=tracks.find(t=>t.id===mixSelectedId)||compatible[0];
  if(!current)return head('DJ TOOLS / HARMONIC MIXING','Mix Compatibility','Find songs that work together using real BPM and musical key metadata.')+
- '<div class="panel"><h2>No complete BPM + Key data yet</h2><p>Open MUSIC LIBRARY and edit your tracks to enter BPM and Key (e.g. 124 and 8A, or A minor). Values are not guessed from Spotify links.</p><button class="btn primary" data-page="library">OPEN LIBRARY</button></div>';
+ '<div class="panel"><h2>No complete BPM + Key data yet</h2><p>MusicAPI enrichment can check your matched Beatport tracks. If the provider has no BPM or Key, you can enter them manually in your library.</p><button class="btn" id="mixEnrich">FIND MISSING BPM / KEY (NEXT 10)</button> <button class="btn primary" data-page="library">OPEN LIBRARY</button></div>';
  mixSelectedId=current.id;
  const results=globalThis.CrateflowMix.recommendations(current,tracks);
  const ready=results.filter(r=>r.score!==null),unknown=results.length-ready.length;
