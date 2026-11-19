@@ -4,7 +4,7 @@ A lightweight web workspace for DJs to bring their own track lists into a Beatpo
 
 ## Spotify links without login (MusicLink adapter)
 
-The app accepts Spotify **track URLs** copied from the Spotify desktop client with Ctrl+A/Ctrl+C/Ctrl+V, including URLs with `?si=`, `rowId=` or `context=` query parameters, as well as `spotify:track:ID` URIs. A batch of up to ten unique links is resolved per explicit user import action. Spotify login is not required. **Spotify playlist URLs** are not resolved: a copied playlist link alone is not a list of tracks.
+The app accepts Spotify **track URLs** copied from the Spotify desktop client with Ctrl+A/Ctrl+C/Ctrl+V, including URLs with `?si=`, `rowId=` or `context=` query parameters, as well as `spotify:track:ID` URIs. A batch of up to ten unique links is resolved per explicit user import action. Spotify login is not required. **Spotify playlist URLs** use the separate MusicAPI import described below.
 
 CRATEFLOW sends each normalized 22-character track ID from the browser to `POST /api/resolve-spotify-track`. The Vercel function uses the documented `GET https://api.ml.jadquir.com/v1/lookup/spotify/:id` endpoint with a MusicLink bearer API key stored **only on the server**. A result is imported only if the provider returns exactly one record whose Spotify link points to the **same track ID**, and it contains nonempty title and artist. ISRC is retained for subsequent Beatport matching if valid. Missing, ambiguous or provider-failed results are reported to the user, never silently assigned.
 
@@ -25,6 +25,14 @@ The text/CSV import remains independent of MusicLink:
 - CSV text/file: `title,artist`
 
 Unsupported URLs and missing-artist lines are not silently imported.
+
+## Whole Spotify playlist URLs (MusicAPI)
+
+Spotify **playlist** URLs and `spotify:playlist:ID` URIs now resolve via the independent server-side `POST /api/resolve-spotify-playlist` endpoint. The MusicAPI Core public inspection endpoint `POST https://api.musicapi.com/public/inspect/playlistItems` accepts a Spotify playlist ID and retrieves up to 50 items per page, using `nextParam` pagination. No Spotify user login is required for supported public playlists. It does not guarantee access to private, restricted, unavailable, or provider-blocked playlists.
+
+MusicAPI credentials `MUSICAPI_CLIENT_ID` and `MUSICAPI_CLIENT_SECRET` are required as Production environment variables on Vercel; the browser never receives them. The UI handles up to three playlist URLs per import and at most ten pages (500 entries) per playlist. More pages, unavailable tracks, failed pages, and provider errors are explicitly reported. Track IDs, titles, artists, albums and valid ISRCs are preserved for matching. Duplicate tracks already in the library are skipped.
+
+Single Spotify **track** URLs continue to use MusicLink, independently of MusicAPI. The playlist endpoint uses only per-instance best-effort IP limits (12 requests/minute, 120/day); use durable authenticated quotas and a provider-usage budget before opening broad public access.
 
 ## Matching and Beatport playlist export
 
