@@ -182,8 +182,8 @@ function studioView(){
  '<div class="flow-hero-bottom"><span>MADE FOR THE WAY YOU LISTEN</span><span class="flow-scroll">SCROLL TO WORKSPACE ↓</span></div></section>'+
  '<div class="flow-workspace-heading"><span>THE WORKSPACE / 001</span><h2>MAKE IT FLOW<span>.</span></h2><p>Import your music. Find the right match. Build your next Beatport playlist.</p></div>'+
  '<div class="studio-status"><span class="pill">NO SPOTIFY LOGIN REQUIRED</span><span class="pill '+(beatport?'':'pending')+'">Beatport '+(beatport?'verified':'not connected')+'</span><button class="btn" data-page="welcome">BEATPORT CONNECTION</button></div>'+
- '<div class="panel studio-main flow-import-panel"><div class="eyebrow">01 / COPY & PASTE TRACKS</div><p class="note cf-paste-help">Paste Artist – Title lines or Title + Artist columns. No Spotify login required. Spotify links alone cannot currently be resolved. If your clipboard contains only Spotify links, use a separately exported CSV with title and artist columns.</p><textarea id="studioPaste" class="field" rows="5" placeholder="Adriatique – Closer (Extended Mix)&#10;Yotto – Another Song">'+esc(studioInput)+'</textarea><div class="row gap"><button class="btn primary" id="studioImport" '+(studioRunning?'disabled':'')+'>IMPORT & MATCH</button><button class="btn" id="uploadCsv">UPLOAD CSV</button><label class="studio-toggle"><input id="studioExtended" type="checkbox" '+(state.settings.preferExtended?'checked':'')+'> Prefer Extended Mix</label></div></div>'+
- '<div class="panel studio-main flow-tracks-panel"><div class="compact-header"><div><div class="eyebrow">02 / MATCHED MUSIC</div><h2>'+tracks.length+' songs</h2></div><div class="row"><button class="btn" id="studioSync" '+(studioRunning||!remaining?'disabled':'')+'>'+(studioRunning?'SEARCHING…':'MATCH NEXT 10')+'</button><button class="btn primary" id="studioExport" '+(studioRunning||studioExporting||!ready.length?'disabled':'')+'>CREATE BEATPORT PLAYLIST</button></div></div>'+
+ '<div class="panel studio-main flow-import-panel"><div class="eyebrow">01 / COPY & PASTE TRACKS</div><p class="note cf-paste-help">Paste Artist – Title lines or Title + Artist columns. No Spotify login required. Paste individual Spotify track URLs, Artist – Title lines, or two spreadsheet columns. Links are resolved via MusicLink when the API is configured. Playlist URLs are not supported.</p><textarea id="studioPaste" class="field" rows="5" placeholder="https://open.spotify.com/track/5KBUE75BEZMGmDnfW8y2gd&#10;Adriatique – Closer (Extended Mix)">'+esc(studioInput)+'</textarea><div class="row gap"><button class="btn primary" id="studioImport" '+(studioRunning||studioResolving?'disabled':'')+'>'+(studioResolving?'RESOLVING LINKS…':'IMPORT & MATCH')+'</button><button class="btn" id="uploadCsv" '+(studioResolving?'disabled':'')+'>UPLOAD CSV</button><label class="studio-toggle"><input id="studioExtended" type="checkbox" '+(state.settings.preferExtended?'checked':'')+'> Prefer Extended Mix</label></div>'+(studioResolving?'<p class="note" role="status" aria-live="polite">Resolving Spotify links '+studioLinkProgress.done+' / '+studioLinkProgress.total+'…</p>':'')+'<p class="cf-provider"><a href="https://musiclink.one/" target="_blank" rel="noopener noreferrer">Track metadata by MusicLink</a></p></div>'+
+ '<div class="panel studio-main flow-tracks-panel"><div class="compact-header"><div><div class="eyebrow">02 / MATCHED MUSIC</div><h2>'+tracks.length+' songs</h2></div><div class="row"><button class="btn" id="studioSync" '+(studioRunning||studioResolving||!remaining?'disabled':'')+'>'+(studioRunning?'SEARCHING…':'MATCH NEXT 10')+'</button><button class="btn primary" id="studioExport" '+(studioRunning||studioResolving||studioExporting||!ready.length?'disabled':'')+'>CREATE BEATPORT PLAYLIST</button></div></div>'+
  '<p class="note">Selected: '+selected.length+' songs · '+ready.length+' ready to add to a new Beatport playlist.</p>'+
  '<div class="compact-summary"><span><b>'+exact+'</b> auto</span><span><b>'+review+'</b> review</span><span><b>'+remaining+'</b> pending</span><span><b>'+ready.length+'</b> ready</span></div>'+
  '<button class="btn studio-select-all" id="studioSelectAll">'+(allChecked?'DESELECT ALL':'SELECT ALL')+'</button>'+
@@ -306,7 +306,7 @@ function onboardingView(){
  const msg=sessionStorage.getItem('beatport_callback_notice');
  return head('WELCOME TO CRATEFLOW','From your discoveries to your decks.','Import track titles and artists without Spotify login. Connect Beatport when you want to match and export.')+
  '<div class="onboard-top"><div><span class="eyebrow">NO SPOTIFY LOGIN REQUIRED</span><h2>Copy. Paste. Match.</h2><p>Begin with a list of tracks or a CSV file. Connecting Beatport is optional until you want to search.</p></div><span class="pill pending">BETA · LOCAL LIBRARY</span></div>'+
- '<div class="onboard-card"><div class="onboard-icon">01</div><div class="onboard-copy"><div class="row" style="justify-content:space-between"><h2>Import tracks</h2><span class="pill">READY</span></div><p>Paste Artist – Track lines or two columns from a spreadsheet. Spotify links without artist names cannot be resolved in this version.</p><button class="btn primary" id="onboardImport">START IMPORT →</button></div></div>'+
+ '<div class="onboard-card"><div class="onboard-icon">01</div><div class="onboard-copy"><div class="row" style="justify-content:space-between"><h2>Import tracks</h2><span class="pill">READY</span></div><p>Paste Artist – Track lines or two columns from a spreadsheet. Individual Spotify track links can be resolved without Spotify login when the licensed MusicLink integration is configured. Spotify playlist URLs are not supported.</p><button class="btn primary" id="onboardImport">START IMPORT →</button></div></div>'+
  '<div class="onboard-card"><div class="onboard-icon">02</div><div class="onboard-copy"><div class="row" style="justify-content:space-between"><h2>Connect Beatport</h2><span class="pill '+(beatport?'':'pending')+'">'+(beatport?'VERIFIED':'NOT CONNECTED')+'</span></div><p>Required for automatic Beatport matching and playlist creation, not for importing tracks. Automatic cart and audio downloads are not available.</p>'+
  (beatport?'<div class="row"><span class="pill">ACCOUNT VERIFIED</span><button class="btn" id="startBeatportLogin">RECONNECT</button></div>':beatportVerificationPending?'<span class="pill pending">VERIFYING CONNECTION…</span>':callback?'<div class="row"><button class="btn primary" id="verifyBeatportLogin">RETRY VERIFICATION</button><button class="btn" id="startBeatportLogin">RECONNECT</button></div>':'<button class="btn primary" id="startBeatportLogin">CONNECT BEATPORT</button>')+
  '</div></div>'+
@@ -337,7 +337,7 @@ function landingView(){
          <label for="landingPlaylistUrl">YOUR TRACK LIST · NO LOGIN NEEDED</label>
          <div class="af-import-row">
            <span class="af-source-icon" aria-hidden="true">♫</span>
-           <textarea id="landingPlaylistUrl" name="tracklist" rows="2" autocomplete="off" placeholder="Artist – Track (one per line)" aria-label="Trackliste mit Künstlern und Titeln" required>${esc(studioInput)}</textarea>
+           <textarea id="landingPlaylistUrl" name="tracklist" rows="2" autocomplete="off" placeholder="Paste Spotify track links or Artist – Title lines" aria-label="Trackliste mit Künstlern und Titeln" required>${esc(studioInput)}</textarea>
            <button type="submit" title="Playlist importieren" aria-label="Playlist importieren">↗</button>
          </div>
        </form>
@@ -356,7 +356,7 @@ function landingView(){
        <div class="af-section-label">THE PROCESS / 01</div>
        <h2>Three steps.<br><em>One seamless flow.</em></h2>
        <div class="af-steps">
-         <article class="af-step"><span>01 /</span><div class="af-step-glyph" aria-hidden="true">↗</div><h3>IMPORT</h3><p>Paste artist – track names. No Spotify login required.</p></article>
+         <article class="af-step"><span>01 /</span><div class="af-step-glyph" aria-hidden="true">↗</div><h3>IMPORT</h3><p>Paste Spotify track links or Artist – Track names. No login required.</p></article>
          <article class="af-step"><span>02 /</span><div class="af-step-glyph" aria-hidden="true">◎</div><h3>MATCH</h3><p>Find tracks on Beatport.</p></article>
          <article class="af-step"><span>03 /</span><div class="af-step-glyph" aria-hidden="true">≡</div><h3>CREATE</h3><p>Build your Beatport playlist.</p></article>
        </div>
@@ -419,7 +419,7 @@ function xmlExport(){let name=$('#exportName').value||'CRATEFLOW',tracks=state.t
 function parsePaste(input){return globalThis.CrateflowClipboard.parse(input)}
 async function importPasted(){
  const value=$('#pasteTracks')?.value||'';
- const result=importTextRows(value,'Pasted tracks');
+ const result=await importTextRows(value,'Pasted tracks');
  if(!result.added){toast(result.message);return}
  if(result.message)toast(result.message);
  else nav('library');
