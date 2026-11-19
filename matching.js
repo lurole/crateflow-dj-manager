@@ -139,13 +139,23 @@
     // The requested mix/version and both title and artist must match before auto-selection.
     const req=sourceVersion(track);
     const preferredKind=preferExtended?"extended":"original";
-    return choices.slice().sort((a,b)=>{
+    const preferred=c=>req.kind==="unspecified"&&c.assessment.versionKind===preferredKind?1:0;
+    const ordered=choices.slice().sort((a,b)=>{
       const x=a.assessment,y=b.assessment;
-      const preferred=c=>req.kind==="unspecified"&&c.assessment.versionKind===preferredKind?1:0;
       return y.score-x.score || Number(y.isrcMatch)-Number(x.isrcMatch) ||
         preferred(b)-preferred(a) || y.rank-x.rank ||
         String(a.externalId).localeCompare(String(b.externalId));
-    })[0];
+    });
+    const best=ordered[0];
+    // Same song title/artist/mix can belong to distinct releases with different IDs.
+    // Without an ISRC or meaningful version preference, arbitrarily choosing one
+    // can silently import the wrong recording into the listener's playlist.
+    const ambiguous=ordered.some(c=>String(c.externalId)!==String(best.externalId)&&
+      c.score===best.score&&
+      Boolean(c.assessment.isrcMatch)===Boolean(best.assessment.isrcMatch)&&
+      preferred(c)===preferred(best)&&
+      c.assessment.versionKind===best.assessment.versionKind);
+    return ambiguous?null:best;
   };
   root.CrateflowMatching=Object.freeze({assess,rankCandidates,bestAutomatic,titleCore,
     sourceVersion,candidateVersion,versionLabel});
