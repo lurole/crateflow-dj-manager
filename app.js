@@ -259,17 +259,17 @@ if(a==='markUnmatched'){t.match={...(t.match||{}),unmatched:true};logSync(t,'Not
 
 
 function onboardingView(){
- const spotify=!!sessionStorage.getItem('spotify_access');
  const beatport=sessionStorage.getItem('beatport_server_verified')==='yes';
  const callback=!!sessionStorage.getItem('beatport_auth_attempt');
  const msg=sessionStorage.getItem('beatport_callback_notice');
- const step=(n,title,description,body,done)=>'<div class="onboard-card"><div class="onboard-icon">'+n+'</div><div class="onboard-copy"><div class="row" style="justify-content:space-between"><h2>'+title+'</h2><span class="pill '+(done?'':'pending')+'">'+(done?'CONNECTED':'NOT CONNECTED')+'</span></div><p>'+description+'</p>'+body+'</div></div>';
- return head('WELCOME TO CRATEFLOW','From your playlists to your decks.','Connect your music accounts, import tracks and review matching candidates in one workspace.')+
- '<div class="onboard-top"><div><span class="eyebrow">FIRST TIME SETUP</span><h2>Connect your accounts</h2><p>No API keys or developer configuration required. Only connect the services you want to use.</p></div><span class="pill pending">BETA · LOCAL LIBRARY</span></div>'+
- step('01','Spotify','Import your playlists and track links using your Spotify account.',spotify?'<button class="btn" id="connectSpotify">RECONNECT SPOTIFY</button>':'<button class="btn primary" id="connectSpotify">CONNECT SPOTIFY</button>',spotify)+
- step('02','Beatport','Sign in through MusicAPI to link your Beatport account. Store cart syncing is not supported yet.',beatport?'<div class="row"><span class="pill">ACCOUNT VERIFIED</span><button class="btn" id="startBeatportLogin">RECONNECT</button></div>':beatportVerificationPending?'<span class="pill pending">VERIFYING CONNECTION…</span>':callback?'<div class="row"><button class="btn primary" id="verifyBeatportLogin">RETRY VERIFICATION</button><button class="btn" id="startBeatportLogin">RECONNECT</button></div>':'<button class="btn primary" id="startBeatportLogin">CONNECT BEATPORT</button>',beatport)+
+ return head('WELCOME TO CRATEFLOW','From your discoveries to your decks.','Import track titles and artists without Spotify login. Connect Beatport when you want to match and export.')+
+ '<div class="onboard-top"><div><span class="eyebrow">NO SPOTIFY LOGIN REQUIRED</span><h2>Copy. Paste. Match.</h2><p>Begin with a list of tracks or a CSV file. Connecting Beatport is optional until you want to search.</p></div><span class="pill pending">BETA · LOCAL LIBRARY</span></div>'+
+ '<div class="onboard-card"><div class="onboard-icon">01</div><div class="onboard-copy"><div class="row" style="justify-content:space-between"><h2>Import tracks</h2><span class="pill">READY</span></div><p>Paste Artist – Track lines or two columns from a spreadsheet. Spotify links without artist names cannot be resolved in this version.</p><button class="btn primary" id="onboardImport">START IMPORT →</button></div></div>'+
+ '<div class="onboard-card"><div class="onboard-icon">02</div><div class="onboard-copy"><div class="row" style="justify-content:space-between"><h2>Connect Beatport</h2><span class="pill '+(beatport?'':'pending')+'">'+(beatport?'VERIFIED':'NOT CONNECTED')+'</span></div><p>Required for automatic Beatport matching and playlist creation, not for importing tracks. Automatic cart and audio downloads are not available.</p>'+
+ (beatport?'<div class="row"><span class="pill">ACCOUNT VERIFIED</span><button class="btn" id="startBeatportLogin">RECONNECT</button></div>':beatportVerificationPending?'<span class="pill pending">VERIFYING CONNECTION…</span>':callback?'<div class="row"><button class="btn primary" id="verifyBeatportLogin">RETRY VERIFICATION</button><button class="btn" id="startBeatportLogin">RECONNECT</button></div>':'<button class="btn primary" id="startBeatportLogin">CONNECT BEATPORT</button>')+
+ '</div></div>'+
  (msg?'<p class="note" style="padding:0 18px">'+esc(msg)+'</p>':'')+
- '<div class="onboard-next"><div><h2>Ready to organize?</h2><p>You can start with Spotify, pasted song lists or CSV. Beatport cart automation is not yet enabled.</p></div><div class="row"><button class="btn" id="finishOnboarding">GO TO DASHBOARD</button><button class="btn primary" id="onboardImport">IMPORT MUSIC →</button></div></div>';
+ '<div class="onboard-next"><div><h2>Ready to organize?</h2><p>Import your music now. Beatport can be connected later.</p></div><div class="row"><button class="btn" id="finishOnboarding">GO TO DASHBOARD</button><button class="btn primary" data-page="import">IMPORT MUSIC →</button></div></div>';
 }
 
 function landingView(){
