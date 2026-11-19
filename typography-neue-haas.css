@@ -1,0 +1,116 @@
+/*
+ CRATEFLOW / NEUE HAAS GROTESK TYPE SYSTEM
+ Official Adobe Fonts web project: https://use.typekit.net/nxa5ott.css
+ Font choices supplied by the project owner.
+ Loaded last for the landing and the whole application.
+*/
+:root{
+ --cf-display:"neue-haas-grotesk-display",sans-serif;
+ --cf-text:"neue-haas-grotesk-text",sans-serif;
+}
+html,body,body :where(*):not(svg):not(path):not(circle):not(rect):not(line):not(polyline):not(polygon):not(ellipse){
+ font-family:var(--cf-text)!important;
+}
+body{font-synthesis:none;font-kerning:normal}
+body p,body input,body textarea,body select,body option,body small{
+ font-family:var(--cf-text)!important;
+ font-weight:700!important;
+ font-style:normal!important;
+ letter-spacing:-.012em;
+}
+body label,body button,body nav,body nav a,body .label,
+body :where(.note,.muted,.pill,.eyebrow,.af-top-pill,.af-section-label){
+ font-family:var(--cf-text)!important;
+ font-weight:700!important;
+ font-style:normal!important;
+}
+body b,body strong{
+ font-family:var(--cf-display)!important;
+ font-weight:700!important;
+ font-style:normal!important;
+}
+/* Bold editorial headlines, following the requested Display 900. */
+body h1,body :where(.af-hero-content h1,.flow-hero-copy h1,.flow-workspace-heading h2){
+ font-family:var(--cf-display)!important;
+ font-weight:900!important;
+ font-style:normal!important;
+ letter-spacing:-.058em!important;
+ line-height:1.03!important;
+ text-wrap:balance;
+}
+body h2,body :where(.af-workflow h2,.af-end h2){
+ font-family:var(--cf-display)!important;
+ font-weight:700!important;
+ font-style:normal!important;
+ letter-spacing:-.046em!important;
+ line-height:1.09!important;
+}
+body h3,body h4,
+body :where(.af-step h3,.af-service-item strong,.compact-name strong,.card strong,.studio-metrics strong){
+ font-family:var(--cf-display)!important;
+ font-weight:700!important;
+ font-style:normal!important;
+ letter-spacing:-.031em!important;
+}
+/* Navigation and interface statements use the requested Display 600. */
+body .af-brand,body:not(.landing-mode) .shell>aside .logo{
+ font-family:var(--cf-display)!important;
+ font-weight:900!important;
+ letter-spacing:-.046em!important;
+}
+body .af-nav nav a,body:not(.landing-mode) .shell>aside nav button,
+body :where(.af-footer,.af-hero-after,.af-service-item small,.af-step>span:first-child),
+body :where(.flow-hero-top,.flow-hero-bottom,.flow-kicker,.flow-workspace-heading>span){
+ font-family:var(--cf-display)!important;
+ font-weight:600!important;
+ font-style:normal!important;
+ letter-spacing:.075em;
+}
+body :where(.af-import-form label,.af-nav-cta,.af-end-cta),
+body:not(.landing-mode) #view :where(.eyebrow,.label,.pill,.btn),
+body:not(.landing-mode) main>header,
+body:not(.landing-mode) #view th{
+ font-family:var(--cf-text)!important;
+ font-weight:700!important;
+ font-style:normal!important;
+}
+body .af-hero-content h1 em,body .af-workflow h2 em{
+ font-family:var(--cf-display)!important;
+ font-weight:900!important;
+ font-style:normal!important;
+}
+body .af-step p,body .af-hero-content>p,body .af-end p,
+body:not(.landing-mode) #view p,
+body:not(.landing-mode) #view .note,
+body:not(.landing-mode) #view .compact-name small{
+ font-family:var(--cf-display)!important;
+ font-weight:600!important;
+ font-style:normal!important;
+ letter-spacing:-.008em;
+ line-height:1.65;
+}
+body:not(.landing-mode) #view .flow-hero-copy h1{
+ letter-spacing:-.065em!important;
+ line-height:1.01!important;
+}
+body:not(.landing-mode) #view .flow-workspace-heading h2{
+ font-weight:900!important;
+}
+body:not(.landing-mode) #view .card strong,
+body:not(.landing-mode) #view .studio-metrics strong,
+body:not(.landing-mode) #view .compact-summary b{
+ font-family:var(--cf-display)!important;
+ font-weight:900!important;
+ letter-spacing:-.06em!important;
+}
+body .af-nav-cta,body .af-end-cta,body:not(.landing-mode) #view .btn{
+ letter-spacing:.065em;
+}
+@media(max-width:620px){
+ body .af-hero-content h1{
+  font-size:clamp(43px,10.1vw,64px)!important;
+  letter-spacing:-.053em!important;
+  line-height:1.06!important;
+ }
+ body:not(.landing-mode) #view .flow-hero-copy h1{letter-spacing:-.049em!important}
+}
