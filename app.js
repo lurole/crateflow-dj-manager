@@ -53,7 +53,7 @@ function applyCatalogCandidate(t,index=0){
  persist();render();toast('Match approved; Beatport cart not changed');
 }
 // One-screen import and matching. Catalog scores are estimates, not guarantees.
-let studioRunning=false,studioExporting=false,studioProgress={done:0,total:0},studioError='',studioInput='',studioExportResult=null,studioShowAll=false,studioModal='',studioPlaylistName='',studioInfoOpen=false;
+let studioResolving=false,studioLinkProgress={done:0,total:0},studioRunning=false,studioExporting=false,studioProgress={done:0,total:0},studioError='',studioInput='',studioExportResult=null,studioShowAll=false,studioModal='',studioPlaylistName='',studioInfoOpen=false;
 function refreshStoredMatches(){
  let changed=false;
  for(const t of state.tracks){
@@ -193,32 +193,74 @@ function studioView(){
  (studioExportResult?'<div class="panel studio-main studio-transfer"><div class="compact-header"><div><div class="eyebrow">03 / BEATPORT PLAYLIST</div><h2>Transfer status</h2></div><button class="btn studio-info-btn" id="studioInfo">'+(studioInfoOpen?'HIDE TRANSFER INFO':'✓ PLAYLIST CREATED')+'</button></div>'+(studioInfoOpen?'<div class="studio-export-success"><strong>'+esc(studioExportResult.added)+' tracks added to playlist: '+esc(studioExportResult.name)+'</strong><p>Your playlist was created in your connected Beatport account.</p><a href="https://www.beatport.com/" target="_blank" rel="noopener noreferrer">OPEN BEATPORT ↗</a></div>':'')+'</div>':'')+
  (studioModal==='playlist'?'<div class="studio-overlay"><div class="studio-dialog" role="dialog" aria-modal="true" aria-labelledby="studioDialogTitle"><button class="studio-close" id="studioClose" aria-label="Close">×</button><h2 id="studioDialogTitle">Create Beatport Playlist</h2><label class="label" for="studioPlaylistTitle">Playlist title</label><input class="field" id="studioPlaylistTitle" maxlength="75" value="'+esc(studioPlaylistName)+'"><div class="row studio-dialog-actions"><button class="btn" id="studioCancel">Cancel</button><button class="btn primary" id="studioCreatePlaylist">Create Playlist</button></div></div></div>':'');
 }
-function importTextRows(input,name='Quick Import'){
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+async function importTextRows(input,name='Quick Import',progress=()=>{}){
  const parsed=globalThis.CrateflowClipboard.parse(input);
- const warnings=[];
- if(parsed.blockedLinks.length)warnings.push(parsed.blockedLinks.length+' link(s) skipped: Spotify URLs alone cannot be resolved without a separate licensed metadata integration. Paste Artist – Title text or CSV instead.');
- if(parsed.missingArtist.length)warnings.push(parsed.missingArtist.length+' row(s) skipped: artist name is required. Use Artist – Title or Title [TAB] Artist.');
- if(!parsed.tracks.length){
-  return {added:0,message:warnings.join(' ')||'No valid tracks found. Use Artist – Title, Title [TAB] Artist, or an exported CSV.'};
+ const rows=[...parsed.tracks],warnings=[];
+ const trackLinks=parsed.blockedLinks.filter(link=>link.kind==='track');
+ const playlists=parsed.blockedLinks.filter(link=>link.kind==='playlist');
+ const unknown=parsed.blockedLinks.filter(link=>link.kind==='unsupported');
+ if(playlists.length)warnings.push(playlists.length+' Spotify playlist URL(s) skipped: only individual track links are supported.');
+ if(unknown.length)warnings.push(unknown.length+' unsupported URL(s) skipped.');
+ if(parsed.missingArtist.length)warnings.push(parsed.missingArtist.length+' track name(s) without an artist were skipped.');
+ let resolved=0,failed=0,notConfigured=false;
+ const batch=trackLinks.slice(0,10);
+ if(trackLinks.length>batch.length)warnings.push((trackLinks.length-batch.length)+' additional links not processed; import up to 10 links per batch.');
+ for(let i=0;i<batch.length;i++){
+  const entry=batch[i];
+  progress(i+1,batch.length);
+  try{
+   const response=await fetch('/api/resolve-spotify-track',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:entry.id})
+   });
+   const payload=await response.json().catch(()=>({}));
+   if(response.ok&&payload.ok&&payload.track?.title&&payload.track?.artist){
+    rows.push({...payload.track,source:'musiclink'});resolved++;
+   }else{
+    failed++;
+    if(payload.code==='not_configured'){
+     notConfigured=true;
+     warnings.push('Spotify link lookup is not enabled yet: the owner must configure a MusicLink API key in Vercel.');
+     break;
+    }
+    if(payload.code==='rate_limited'||payload.code==='provider_rate_limit'){
+     warnings.push('Track lookup limit reached. Try again later or paste Artist – Title.');
+     break;
+    }
+    warnings.push('Track '+(i+1)+' was not resolved: '+String(payload.error||'Unknown metadata error').slice(0,130));
+   }
+  }catch{
+   failed++;warnings.push('Track '+(i+1)+' could not be resolved because the metadata service is unavailable.');
+  }
+  // The free MusicLink API allows one request/second. Avoid burst traffic.
+  if(i<batch.length-1)await sleep(1100);
  }
- const added=importTracks(parsed.tracks,name);
- return {added,message:warnings.join(' ')};
+ const added=rows.length?importTracks(rows,name):0;
+ if(notConfigured&&batch.length>1)warnings.push('Other Spotify links were not processed.');
+ return {added,resolved,failed,linkCount:trackLinks.length,message:warnings.join(' '),
+  hasUnresolved:failed>0||notConfigured||trackLinks.length>batch.length||playlists.length>0||unknown.length>0||parsed.missingArtist.length>0};
 }
 async function studioImport(){
- if(studioRunning)return;
+ if(studioRunning||studioResolving)return;
  const input=$('#studioPaste')?.value||studioInput||'';
  studioInput=input;
- if(!input.trim())return toast('Paste an artist and track list first');
- studioError='';
- const result=importTextRows(input,'Quick Import');
- studioError=result.message;
- if(!result.added){render();toast(result.message);return}
- // Keep the original text visible if some rows were skipped, so they can be corrected.
- if(!result.message)studioInput='';
- localStorage.setItem('crateflow_onboarded','yes');
- render();
- if(result.message)toast(result.added+' imported; some rows need attention.');
- else toast(result.added+' tracks imported — no Spotify login required.');
+ if(!input.trim())return toast('Paste Spotify track URLs or Artist – Title lines first.');
+ studioError='';studioResolving=true;studioLinkProgress={done:0,total:0};render();
+ let result;
+ try{
+  result=await importTextRows(input,'Quick Import',(done,total)=>{
+   studioLinkProgress={done,total};render();
+  });
+  studioError=result.message;
+  if(!result.added){toast(result.message||'No tracks imported');return}
+  if(!result.hasUnresolved)studioInput='';
+  localStorage.setItem('crateflow_onboarded','yes');
+  toast(result.added+' tracks imported'+(result.resolved?' · '+result.resolved+' Spotify links resolved':'')+
+    (result.hasUnresolved?' · review import warnings':''));
+ }catch(err){
+  studioError=String(err.message||err);toast(studioError);return;
+ }finally{studioResolving=false;studioLinkProgress={done:0,total:0};render()}
  if(sessionStorage.getItem('beatport_server_verified')==='yes')await studioSync();
 }
 
