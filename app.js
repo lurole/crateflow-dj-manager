@@ -195,7 +195,7 @@ function studioView(){
     result==='error'?'SEARCH FAILED':'SEARCHING';
   const selectedMatch=['exact','id_ready','manual'].includes(result)?t.studioCandidate:null;
   const selectedInfo=selectedMatch?
-    '<div class="compact-match-note"><span>'+esc(selectedMatch.name||t.title)+'</span><button class="btn" data-act="studioChange" data-id="'+t.id+'">CHANGE</button></div>':'';
+    '<div class="compact-match-note"><span>'+esc(selectedMatch.name||t.title)+'</span></div>':'';
   // Only exceptions need a decision. Hide internal metadata percentages and
   // scoring reasons: they are matching safeguards, not useful DJ-facing data.
   const reviewOptions=result==='review'?
