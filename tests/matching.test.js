@@ -63,10 +63,10 @@ test('matching ISRC contributes to ranking',()=>{
  assert.equal(candidates[0].assessment.isrcMatch,true);
 });
 
-test('multiple equally compatible Beatport releases select a deterministic single highest score',()=>{
+test('multiple indistinguishable Beatport releases require review, not an arbitrary ID',()=>{
  const t=track('Closer (Original Mix)');
  const candidates=matches(t,[candidate('Closer (Original Mix)','Adriatique','102'),candidate('Closer (Original Mix)','Adriatique','101')]);
- assert.equal(matching.bestAutomatic(t,candidates).externalId,'101');
+ assert.equal(matching.bestAutomatic(t,candidates),null);
 });
 
 test('same metadata score prefers matching ISRC over a different release',()=>{
