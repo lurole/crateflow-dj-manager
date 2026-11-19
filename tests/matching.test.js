@@ -119,3 +119,25 @@ test('generic remixes are never automatically substituted for an unspecified sou
  const candidates=matches(t,[candidate('Closer (Sasha Remix)')]);
  assert.equal(matching.bestAutomatic(t,candidates),null);
 });
+
+test('additional Beatport collaborators do not penalize the original credited artist',()=>{
+ const source=track('Doa','Traumer');
+ const result=matches(source,[candidate('Doa','Traumer, Anton, antraum','121')])[0];
+ assert.equal(result.score,100);
+ assert.equal(result.assessment.autoEligible,true);
+ assert.equal(result.assessment.additionalArtistCredits,true);
+ assert.equal(matching.bestAutomatic(source,[result]).externalId,'121');
+});
+
+test('different or similarly named artists still require manual review',()=>{
+ const source=track('Doa','Traumer');
+ const result=matches(source,[candidate('Doa','Traumermusic, Anton, antraum','122')])[0];
+ assert.equal(result.assessment.autoEligible,false);
+ assert.equal(matching.bestAutomatic(source,[result]),null);
+});
+
+test('matching an extra-credits release still refuses an explicitly wrong remix',()=>{
+ const source=track('Doa (Original Mix)','Traumer');
+ const result=matches(source,[candidate('Doa (Radio Edit)','Traumer, Anton, antraum','123')])[0];
+ assert.equal(result.assessment.autoEligible,false);
+});
