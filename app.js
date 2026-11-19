@@ -319,7 +319,14 @@ async function autoEnrichFromBeatport(t){
  const selected=t.studioCandidate;
  if(!selected||!['exact','id_ready','manual'].includes(t.studioResult))
   return {status:'needs_review'};
- const urlId=String(selected.url||'').match(/beatport\\.com\\/track\\/[^/]+\\/(\\d{1,12})(?:[/?#]|$)/)?.[1]||'';
+ let urlId='';
+ try{
+  const parsed=new URL(String(selected.url||''));
+  if(parsed.hostname==='www.beatport.com'||parsed.hostname==='beatport.com'){
+   const parts=parsed.pathname.split('/').filter(Boolean);
+   if(parts[0]==='track'&&/^[0-9]{1,12}$/.test(parts[parts.length-1]))urlId=parts[parts.length-1];
+  }
+ }catch{}
  const id=String(selected.beatportId||urlId);
  const response=await fetch('/api/enrich-beatport-dj',{
   method:'POST',headers:{'Content-Type':'application/json'},
