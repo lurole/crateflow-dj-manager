@@ -5,7 +5,7 @@
  const camelotMinor=['G#m','D#m','A#m','Fm','Cm','Gm','Dm','Am','Em','Bm','F#m','C#m'];
  const camelotMajor=['B','F#','C#','G#','D#','A#','F','C','G','D','A','E'];
  const clean=s=>String(s??'').trim().replace(/♭/g,'b').replace(/♯/g,'#');
- const noteAlias={Db:'C#',Eb:'D#',Gb:'F#',Ab:'G#',Bb:'A#',Cb:'B',Fb:'E',E#:'F',B#:'C'};
+ const noteAlias={Db:'C#',Eb:'D#',Gb:'F#',Ab:'G#',Bb:'A#',Cb:'B',Fb:'E','E#':'F','B#':'C'};
  const parseKey=value=>{
   const raw=clean(value);
   const coded=raw.match(/^(1[0-2]|[1-9])\s*([AaBb])$/);
