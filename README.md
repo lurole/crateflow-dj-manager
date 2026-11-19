@@ -34,6 +34,12 @@ MusicAPI credentials `MUSICAPI_CLIENT_ID` and `MUSICAPI_CLIENT_SECRET` are requi
 
 Single Spotify **track** URLs continue to use MusicLink, independently of MusicAPI. The playlist endpoint uses only per-instance best-effort IP limits (12 requests/minute, 120/day); use durable authenticated quotas and a provider-usage budget before opening broad public access.
 
+## One-click import and automatic DJ enrichment
+
+Import & Match now runs in this order: user-pasted Spotify track or public playlist URL → existing MusicLink (single track) or MusicAPI (playlist) import → connected Beatport/MusicAPI title, artist and version matching → verified API.SH Beatport lookup for optional BPM, Camelot key and genre. Each successfully retrieved field is recorded with an API.SH source marker, and existing metadata is never overwritten. Ambiguous/wrong-version matches are left for review, not silently assigned.
+
+Automatic runs are browser-side and must remain in an open tab; they are not background jobs. The MVP limits automatic processing to **40 newly imported tracks per click**, because each API.SH lookup can consume a credit and the API.SH endpoint currently has a best-effort 40/day limit per IP/server instance. A queued remainder can be resumed with **CONTINUE NEXT 10** on the import screen, subject to provider and daily rate limits. Catalog and metadata calls are spaced out. No second button or permission prompt is needed within a normal <=40-track import once Beatport has been connected. For large playlists, a durable server-side job queue, account-scoped quotas, credit budgets, and resumable jobs are needed before promising unattended end-to-end processing.
+
 ## Matching and Beatport playlist export
 
 Connect a Beatport account via MusicAPI when ready to match songs. `MUSICAPI_ENABLE_VERIFICATION=true` and valid server-side `MUSICAPI_CLIENT_ID`/`MUSICAPI_CLIENT_SECRET` are required. Provider account lookups are gated; there is basic per-instance throttling that is not sufficient for unrestricted public access.
