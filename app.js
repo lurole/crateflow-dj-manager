@@ -444,7 +444,7 @@ function mixView(){
  const compatible=tracks.filter(t=>globalThis.CrateflowMix.parseKey(t.key)&&globalThis.CrateflowMix.bpmValue(t.bpm));
  const current=tracks.find(t=>t.id===mixSelectedId)||compatible[0];
  if(!current)return head('DJ TOOLS / HARMONIC MIXING','Mix Compatibility','Find songs that work together using real BPM and musical key metadata.')+
- '<div class="panel"><h2>No complete BPM + Key data yet</h2><p>MusicAPI enrichment can check your matched Beatport tracks. If the provider has no BPM or Key, you can enter them manually in your library.</p><button class="btn" id="mixEnrich">FIND MISSING BPM / KEY (NEXT 10)</button> <button class="btn primary" data-page="library">OPEN LIBRARY</button></div>';
+ '<div class="panel"><h2>No complete BPM + Key data yet</h2><p>API.SH searches Beatport for verified BPM and Camelot key. One credit per lookup; missing metadata can also be entered manually.</p><button class="btn" id="mixEnrich">ENRICH BPM + KEY (UP TO 10)</button> <button class="btn primary" data-page="library">OPEN LIBRARY</button></div>';
  mixSelectedId=current.id;
  const results=globalThis.CrateflowMix.recommendations(current,tracks);
  const ready=results.filter(r=>r.score!==null),unknown=results.length-ready.length;
@@ -452,7 +452,7 @@ function mixView(){
  '<div class="panel"><div class="eyebrow">SOURCE TRACK</div><select class="field" id="mixSource">'+tracks.map(t=>'<option value="'+esc(t.id)+'" '+(t.id===current.id?'selected':'')+'>'+esc(t.artist+' – '+t.title)+'</option>').join('')+'</select>'+
  '<p class="note">Key '+esc(globalThis.CrateflowMix.parseKey(current.key)||'not available')+' · '+esc(current.bpm||'BPM not available')+' BPM</p>'+
  '<p class="note">'+ready.length+' rated · '+unknown+' missing BPM or key. To add metadata, open MUSIC LIBRARY and choose EDIT for a track.</p></div>'+
- '<div class="panel"><div class="row"><button class="btn" id="mixEnrich" '+(studioRunning?'disabled':'')+'>FIND MISSING BPM / KEY (NEXT 10)</button></div><p class="note">MusicAPI may not provide BPM or key for every track. Existing values are kept.</p></div>'+
+ '<div class="panel"><div class="row"><button class="btn" id="mixEnrich" '+(studioRunning?'disabled':'')+'>ENRICH BPM + KEY (UP TO 10)</button></div><p class="note">Powered by API.SH Beatport metadata. Each lookup uses 1 API.SH credit. Existing BPM/key values are never overwritten.</p></div>'+
  '<div class="panel"><h2>Recommended next tracks</h2><div class="table"><table><thead><tr><th>TRACK</th><th>KEY</th><th>BPM</th><th>COMPATIBILITY</th><th>REASON</th></tr></thead><tbody>'+
  results.map(r=>'<tr><td><strong>'+esc(r.track.title)+'</strong><small>'+esc(r.track.artist)+'</small></td><td>'+esc(r.keyB||'—')+'</td><td>'+esc(r.bpmB??'—')+'</td>'+
  '<td>'+ (r.score===null?'NOT RATED':r.score+'% · '+esc(r.label))+'</td><td>'+esc(r.score===null?'Enter missing BPM/Key':r.keyReason+(r.bpmDifference!==null?' · '+r.bpmDifference.toFixed(1)+'% tempo':'') )+'</td></tr>').join('')+
@@ -515,18 +515,45 @@ async function importPasted(){
 function edit(t){const title=prompt('Track title',t.title);if(title===null)return;t.title=title.trim()||t.title;const artist=prompt('Artist',t.artist);if(artist===null)return;t.artist=artist.trim()||t.artist;const remix=prompt('Remix / Mix',t.remix||'');if(remix!==null)t.remix=remix;const bpm=prompt('BPM',t.bpm||'');if(bpm!==null)t.bpm=bpm;const key=prompt('Key',t.key||'');if(key!==null)t.key=key;const genre=prompt('Genre',t.genre||'');if(genre!==null)t.genre=genre;const status=prompt('Status: pending | cart | owned | downloaded',t.status);if(status&&['pending','cart','owned','downloaded'].includes(status.toLowerCase()))t.status=status.toLowerCase();const path=prompt('Absolute local audio file path',t.filePath||'');if(path!==null)t.filePath=path;persist();render()}
 function bind(){const on=(sel,fn,event='click')=>{let e=$(sel);if(e)e.addEventListener(event,fn)};on('#landingBottomStart',()=>nav('import'));on('#landingLogin',()=>nav('import'));on('#landingPlaylistUrl',e=>{studioInput=e.target.value},'input');on('#landingImportForm',e=>{e.preventDefault();const text=$('#landingPlaylistUrl')?.value.trim();if(!text)return;studioInput=text;localStorage.setItem('crateflow_onboarded','yes');nav('import');studioImport()},'submit');on('#mixSource',e=>{mixSelectedId=e.target.value;render()},'change');on('#mixEnrich',async()=>{
  if(studioRunning)return;
- if(sessionStorage.getItem('beatport_server_verified')!=='yes')return toast('Connect Beatport before searching for DJ metadata');
  const pool=state.tracks.filter(t=>globalThis.CrateflowMix.bpmValue(t.bpm)===null||!globalThis.CrateflowMix.parseKey(t.key)).slice(0,10);
  if(!pool.length)return toast('No missing BPM or key');
- studioRunning=true;render();let enriched=0;
+ if(!confirm('Look up '+pool.length+' track(s) using API.SH? Each lookup can use 1 API.SH credit. Existing BPM/key values stay unchanged.'))return;
+ studioRunning=true;render();let enriched=0,unavailable=0,errors=[];
  try{
   for(const t of pool){
-   const before=String(t.bpm)+'|'+String(t.key);
-   try{await searchCatalogTrack(t);if(before!==String(t.bpm)+'|'+String(t.key))enriched++}
-   catch(e){logSync(t,'DJ metadata lookup error',String(e.message||e).slice(0,120))}
+   try{
+    const verified=t.studioCandidate||{};
+    const urlId=String(verified.url||'').match(/beatport\.com\/track\/[^/]+\/(\d{1,12})(?:[/?#]|$)/)?.[1]||'';
+    const id=String(verified.beatportId||urlId);
+    const response=await fetch('/api/enrich-beatport-dj',{
+     method:'POST',headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({title:t.title,artist:t.artist,remix:t.remix||'',isrc:t.isrc||'',...(id?{beatportId:id}:{})})
+    });
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok||!result.ok){
+     errors.push(t.artist+' – '+t.title+': '+String(result.error||'Lookup failed').slice(0,110));
+     if([429,503].includes(response.status))break;
+     continue;
+    }
+    let changed=false;
+    if(globalThis.CrateflowMix.bpmValue(t.bpm)===null&&globalThis.CrateflowMix.bpmValue(result.bpm)!==null){
+     t.bpm=result.bpm;t.bpmSource='api.sh-beatport';changed=true;
+    }
+    const key=globalThis.CrateflowMix.parseKey(result.key);
+    if(!globalThis.CrateflowMix.parseKey(t.key)&&key){
+     t.key=key;t.keySource='api.sh-beatport';changed=true;
+    }
+    if(changed){enriched++;logSync(t,'DJ metadata enriched','API.SH Beatport · BPM '+String(result.bpm??'—')+' · Key '+String(key||'—'))}
+    else unavailable++;
+   }catch(e){errors.push(t.title+': lookup failed')}
    persist();
   }
- }finally{studioRunning=false;render();toast(enriched+' tracks enriched with available BPM/key metadata')}
+ }finally{
+  studioRunning=false;
+  studioError=errors.slice(0,4).join(' | ');
+  persist();render();
+  toast(enriched+' tracks enriched · '+unavailable+' unavailable'+(errors.length?' · '+errors.length+' errors (see Import & Sync)':''));
+ }
 });on('#studioPaste',v=>{studioInput=v.target.value},'input');on('#studioImport',studioImport);on('#studioSync',()=>studioSync());on('#studioShowAll',()=>{studioShowAll=true;render()});on('#studioSelectAll',studioToggleAll);on('#studioClose',()=>{studioModal='';render()});on('#studioCancel',()=>{studioModal='';render()});on('#studioInfo',()=>{studioInfoOpen=!studioInfoOpen;render()});on('#studioPlaylistTitle',e=>{studioPlaylistName=e.target.value},'input');on('#studioCreatePlaylist',exportToBeatportPlaylist);document.querySelectorAll('.compact-check').forEach(el=>el.addEventListener('change',()=>{const t=state.tracks.find(t=>t.id===el.dataset.id);if(t){t.studioSelected=el.checked;persist();render()}}));on('#studioExport',studioOpenPlaylistDialog);on('#studioUseExisting',()=>{studioInput='';render()});on('#studioExtended',v=>{state.settings.preferExtended=v.target.checked;refreshStoredMatches();persist();render()},'change');on('#finishOnboarding',()=>{localStorage.setItem('crateflow_onboarded','yes');nav('overview')});on('#onboardImport',()=>{localStorage.setItem('crateflow_onboarded','yes');nav('import')});on('#preferExtended',e=>{state.settings.preferExtended=e.target.checked;refreshStoredMatches();persist();render()},'change');on('#searchFirstMatch',()=>{let t=state.tracks.find(t=>!t.match?.url&&t.status==='pending');if(!t)return toast('No unmatched tracks');window.open(storeSearch(t),'_blank','noopener');logSync(t,'Search opened','Beatport search opened');render()});on('#catalogBatch',lookupQueue);on('#downloadHistory',()=>download('crateflow-sync-history.json',JSON.stringify(state.syncHistory,null,2),'application/json'));on('#saveMusicApiSlug',()=>{let v=($('#musicApiSlug')?.value||'').trim().toLowerCase();if(!/^[a-z0-9][a-z0-9-]{1,62}$/.test(v))return toast('Check MusicAPI account slug');state.settings.musicApiSlug=v;persist();toast('MusicAPI slug saved')});on('#verifyBeatportLogin',()=>verifyBeatportConnection());on('#startBeatportLogin',()=>{const slug='tracky';state.settings.musicApiSlug=slug;persist();sessionStorage.removeItem('beatport_server_verified');sessionStorage.removeItem('beatport_auth_attempt');sessionStorage.removeItem('beatport_claimed_user');sessionStorage.removeItem('beatport_callback_notice');const returnUrl=location.origin+'/';window.location.assign('https://app.musicapi.com/'+slug+'/beatport/auth?returnUrl='+encodeURIComponent(returnUrl))});on('#exportBeatportRequest',()=>{const request='Subject: Beatport API integration request for CRATEFLOW\\n\\nHello Beatport Partnerships Team,\\n\\nI am developing CRATEFLOW, a personal DJ music manager that imports Spotify playlist metadata, identifies corresponding Beatport releases and lets the account holder review candidates before purchase. I would like to ask about authorized API access and OAuth integration. Specifically, are track search, user purchase history and adding an approved track to the user\'s default shopping cart available to third-party partners? Are there licensing, commercial or technical requirements? Checkout and payment would remain on Beatport.com.\\n\\nWebsite: '+location.origin+'\\n\\nThank you.';navigator.clipboard.writeText(request.replaceAll('\\n','\\n')).then(()=>toast('API request copied')).catch(()=>toast('Clipboard permission denied'))});on('#importPasted',importPasted);on('#clearPasted',()=>{$('#pasteTracks').value=''});on('#uploadCsv',()=>$('#csv').click());on('#quickAdd',()=>{let title=$('#quickTitle').value,artist=$('#quickArtist').value;if(!title.trim())return toast('Title required');importTracks([{title,artist}],'Manual additions');nav('library')});on('#search',e=>{search=e.target.value;let pos=e.target.selectionStart;render();$('#search').focus();$('#search').setSelectionRange(pos,pos)},'input');on('#filter',e=>{filter=e.target.value;render()},'change');on('#playlistFilter',e=>{playlistFilter=e.target.value;render()},'change');on('#searchNext',()=>{let t=state.tracks.find(t=>t.status==='pending');if(t)window.open(beatport(t),'_blank','noopener');else toast('Nothing pending')});on('#copyQueue',()=>{navigator.clipboard.writeText(state.tracks.filter(t=>t.status==='pending').map(t=>t.artist+' – '+t.title).join('\n')).then(()=>toast('Copied'))});on('#beatportSite',()=>window.open('https://www.beatport.com','_blank','noopener'));on('#backup',()=>download('crateflow-backup.json',JSON.stringify(state,null,2),'application/json'));on('#restoreBtn',()=>$('#restore').click());on('#csvExport',csvExport);on('#xmlExport',xmlExport);on('#clearAll',()=>{if(confirm('Delete all local tracks and playlists?')){state=structuredClone(defaults);persist();render()}})}
 document.addEventListener('click',e=>{let p=e.target.closest('[data-page]');if(p)return nav(p.dataset.page);let a=e.target.closest('[data-act]');if(!a)return;let t=state.tracks.find(t=>t.id===a.dataset.id);if(!t)return;if(a.dataset.act==='studioRetry')return studioSync([t.id]);if(a.dataset.act==='studioChange'){t.studioResult='review';t.studioCandidate=null;if(t.match?.source==='musicapi')delete t.match;persist();return render();}if(a.dataset.act==='studioChoose')return studioChoose(t,Number(a.dataset.index||0));if(a.dataset.act==='catalogLookup')return lookupMusicApi(t);if(a.dataset.act==='acceptCatalog')return applyCatalogCandidate(t,Number(a.dataset.index||0));if(['searchMatch','saveMatch','markCart','markUnmatched'].includes(a.dataset.act))return handleMatching(a.dataset.act,t);if(a.dataset.act==='beatport')window.open(beatport(t),'_blank','noopener');else if(a.dataset.act==='edit')edit(t);else if(a.dataset.act==='delete'&&confirm('Remove '+t.title+'?')){state.tracks=state.tracks.filter(x=>x.id!==t.id);persist();render()}});
 $('#csv').addEventListener('change',async e=>{let file=e.target.files[0];if(!file)return;try{const rows=csvParse(await file.text());if(!rows.length){toast('CSV must include title and artist columns.');return}const added=importTracks(rows,file.name.replace(/\.csv$/i,''));nav('import');if(added&&sessionStorage.getItem('beatport_server_verified')==='yes')await studioSync()}catch(err){toast(err.message)}finally{e.target.value=''}});
