@@ -136,7 +136,7 @@ function studioToggleAll(){
  persist();render();
 }
 function studioView(){
- const spotify=!!sessionStorage.getItem('spotify_access'),beatport=sessionStorage.getItem('beatport_server_verified')==='yes';
+ const beatport=sessionStorage.getItem('beatport_server_verified')==='yes';
  const tracks=state.tracks.filter(t=>!['owned','downloaded'].includes(t.status));
  const selected=tracks.filter(t=>t.studioSelected!==false),ready=selected.filter(studioEligible);
  const exact=tracks.filter(t=>t.studioResult==='exact'||t.studioResult==='id_ready').length;
@@ -181,8 +181,8 @@ function studioView(){
  '</div>'+
  '<div class="flow-hero-bottom"><span>MADE FOR THE WAY YOU LISTEN</span><span class="flow-scroll">SCROLL TO WORKSPACE ↓</span></div></section>'+
  '<div class="flow-workspace-heading"><span>THE WORKSPACE / 001</span><h2>MAKE IT FLOW<span>.</span></h2><p>Import your music. Find the right match. Build your next Beatport playlist.</p></div>'+
- '<div class="studio-status"><span class="pill '+(spotify?'':'pending')+'">Spotify '+(spotify?'connected':'not connected')+'</span><span class="pill '+(beatport?'':'pending')+'">Beatport '+(beatport?'verified':'not verified')+'</span><button class="btn" data-page="welcome">ACCOUNTS</button></div>'+
- '<div class="panel studio-main flow-import-panel"><div class="eyebrow">01 / YOUR SOURCE</div><textarea id="studioPaste" class="field" rows="3" placeholder="Paste Spotify playlist, Spotify track links, or artist - song lines">'+esc(studioInput)+'</textarea><div class="row gap"><button class="btn primary" id="studioImport" '+(studioRunning?'disabled':'')+'>IMPORT & MATCH</button><label class="studio-toggle"><input id="studioExtended" type="checkbox" '+(state.settings.preferExtended?'checked':'')+'> Prefer Extended Mix</label></div></div>'+
+ '<div class="studio-status"><span class="pill">NO SPOTIFY LOGIN REQUIRED</span><span class="pill '+(beatport?'':'pending')+'">Beatport '+(beatport?'verified':'not connected')+'</span><button class="btn" data-page="welcome">BEATPORT CONNECTION</button></div>'+
+ '<div class="panel studio-main flow-import-panel"><div class="eyebrow">01 / COPY & PASTE TRACKS</div><p class="note cf-paste-help">Paste Artist – Title lines or Title + Artist columns. No Spotify login required. Spotify links alone cannot currently be resolved. Use CSV if your copied content contains only links.</p><textarea id="studioPaste" class="field" rows="5" placeholder="Adriatique – Closer (Extended Mix)&#10;Yotto – Another Song">'+esc(studioInput)+'</textarea><div class="row gap"><button class="btn primary" id="studioImport" '+(studioRunning?'disabled':'')+'>IMPORT & MATCH</button><label class="studio-toggle"><input id="studioExtended" type="checkbox" '+(state.settings.preferExtended?'checked':'')+'> Prefer Extended Mix</label></div></div>'+
  '<div class="panel studio-main flow-tracks-panel"><div class="compact-header"><div><div class="eyebrow">02 / MATCHED MUSIC</div><h2>'+tracks.length+' songs</h2></div><div class="row"><button class="btn" id="studioSync" '+(studioRunning||!remaining?'disabled':'')+'>'+(studioRunning?'SEARCHING…':'MATCH NEXT 10')+'</button><button class="btn primary" id="studioExport" '+(studioRunning||studioExporting||!ready.length?'disabled':'')+'>CREATE BEATPORT PLAYLIST</button></div></div>'+
  '<p class="note">Selected: '+selected.length+' songs · '+ready.length+' ready to add to a new Beatport playlist.</p>'+
  '<div class="compact-summary"><span><b>'+exact+'</b> auto</span><span><b>'+review+'</b> review</span><span><b>'+remaining+'</b> pending</span><span><b>'+ready.length+'</b> ready</span></div>'+
