@@ -75,6 +75,17 @@ function refreshStoredMatches(){
     t.studioCandidate={...best};
     if(t.match?.source==='musicapi')t.match.score=best.score;
    }
+  }else if(t.studioResult==='review'){
+   // Upgrade existing review entries when exactly compatible artist/title/version metadata is available.
+   const best=globalThis.CrateflowMatching.bestAutomatic(t,ranked,state.settings.preferExtended);
+   if(best){
+    t.studioCandidate={...best};
+    if(best.url){
+     t.match={url:best.url,title:best.name,artist:best.artist,mix:best.mixHint,score:best.score,source:'musicapi',confirmedAt:Date.now()};
+     t.studioResult='exact';
+    }else t.studioResult='id_ready';
+    changed=true;
+   }
   }else if(t.studioResult==='missing_url'){
    t.studioResult='review';t.studioCandidate=null;changed=true;
   }
@@ -89,7 +100,7 @@ function autoSelectExact(t,candidates){
  if(!best){
   t.studioResult='review';t.studioCandidate=null;
   if(t.match?.source==='musicapi')delete t.match;
-  logSync(t,'Match needs review',candidates.length?'Multiple, incomplete or conflicting metadata candidates':'No Beatport candidate returned');
+  logSync(t,'Match needs review',candidates.length?'No safe title, artist and version match':'No Beatport candidate returned');
   return;
  }
  t.studioCandidate={...best};
@@ -157,7 +168,7 @@ function studioView(){
     ' · '+esc(selectedMatch.score)+'% metadata</span><button class="btn" data-act="studioChange" data-id="'+t.id+'">CHANGE</button></div>':'';
   const reviewOptions=result==='review'?
     '<div class="compact-options" aria-label="Beatport match candidates for '+esc(t.title)+'">'+
-    (matches.length?matches.slice(0,4).map((m,i)=>
+    (matches.length?matches.slice(0,1).map((m,i)=>
       '<div class="compact-option"><span><strong>'+esc(m.name)+'</strong><small>'+esc(m.artist)+' · '+esc(m.assessment?.candidateVersion||m.mixHint||'Version unspecified')+
       ' · '+esc(m.score)+'% metadata</small><small class="compact-reason">'+esc(m.assessment?.reason||'Review before selecting')+'</small></span>'+
       '<button class="btn" data-act="studioChoose" data-id="'+t.id+'" data-index="'+i+'" '+(!m.externalId?'disabled title="Beatport playlist ID unavailable"':'')+'>SELECT</button></div>'
