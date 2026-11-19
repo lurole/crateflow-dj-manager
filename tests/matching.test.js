@@ -63,10 +63,16 @@ test('matching ISRC contributes to ranking',()=>{
  assert.equal(candidates[0].assessment.isrcMatch,true);
 });
 
-test('duplicate Beatport release IDs with same metadata require manual decision',()=>{
+test('multiple equally compatible Beatport releases select a deterministic single highest score',()=>{
  const t=track('Closer (Original Mix)');
- const candidates=matches(t,[candidate('Closer (Original Mix)','Adriatique','101'),candidate('Closer (Original Mix)','Adriatique','102')]);
- assert.equal(matching.bestAutomatic(t,candidates),null);
+ const candidates=matches(t,[candidate('Closer (Original Mix)','Adriatique','102'),candidate('Closer (Original Mix)','Adriatique','101')]);
+ assert.equal(matching.bestAutomatic(t,candidates).externalId,'101');
+});
+
+test('same metadata score prefers matching ISRC over a different release',()=>{
+ const t=track('Closer','Adriatique',{isrc:'USABC1234567'});
+ const candidates=matches(t,[candidate('Closer','Adriatique','2'),candidate('Closer','Adriatique','1',{isrc:'USABC1234567'})]);
+ assert.equal(matching.bestAutomatic(t,candidates).externalId,'1');
 });
 
 test('same candidate ID repeated is not falsely ambiguous',()=>{
