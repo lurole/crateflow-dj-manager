@@ -180,6 +180,10 @@ function studioView(){
  const exact=tracks.filter(t=>t.studioResult==='exact'||t.studioResult==='id_ready').length;
  const review=tracks.filter(t=>['review','error','missing_url'].includes(t.studioResult)).length;
  const remaining=tracks.filter(t=>!t.studioResult).length;
+ const resumable=tracks.filter(t=>t.status==='pending'&&
+  (!t.studioResult||t.studioResult==='error'||
+   (['exact','id_ready','manual'].includes(t.studioResult)&&!t.djEnrichment?.checkedAt&&
+    (globalThis.CrateflowMix.bpmValue(t.bpm)===null||!globalThis.CrateflowMix.parseKey(t.key)||!String(t.genre||'').trim())))).length;
  const percent=studioProgress.total?Math.round(studioProgress.done/studioProgress.total*100):0;
  const list=studioShowAll?tracks:tracks.slice(0,30);
  const allChecked=tracks.length>0&&tracks.every(t=>t.studioSelected!==false);
@@ -221,7 +225,7 @@ function studioView(){
  '<div class="flow-workspace-heading"><span>THE WORKSPACE / 001</span><h2>MAKE IT FLOW<span>.</span></h2><p>Import your music. Find the right match. Build your next Beatport playlist.</p></div>'+
  '<div class="studio-status"><span class="pill">NO SPOTIFY LOGIN REQUIRED</span><span class="pill '+(beatport?'':'pending')+'">Beatport '+(beatport?'verified':'not connected')+'</span><button class="btn" data-page="welcome">BEATPORT CONNECTION</button></div>'+
  '<div class="panel studio-main flow-import-panel"><div class="eyebrow">01 / COPY & PASTE TRACKS</div><p class="note cf-paste-help">Paste Artist – Title lines or Title + Artist columns. No Spotify login required. Paste individual Spotify track URLs, Artist – Title lines, or two spreadsheet columns. Links are resolved via MusicLink when the API is configured. Spotify playlist URLs are imported via MusicAPI; individual Spotify track URLs use MusicLink (public playlists only, up to 500 entries per playlist).</p><textarea id="studioPaste" class="field" rows="5" placeholder="https://open.spotify.com/track/5KBUE75BEZMGmDnfW8y2gd&#10;Adriatique – Closer (Extended Mix)">'+esc(studioInput)+'</textarea><div class="row gap"><button class="btn primary" id="studioImport" '+(studioRunning||studioResolving?'disabled':'')+'>'+(studioResolving?'IMPORTING TRACKS…':studioRunning?'MATCHING & ENRICHING…':'IMPORT & MATCH')+'</button><button class="btn" id="uploadCsv" '+(studioResolving?'disabled':'')+'>UPLOAD CSV</button><label class="studio-toggle"><input id="studioExtended" type="checkbox" '+(state.settings.preferExtended?'checked':'')+'> Prefer Extended Mix</label></div>'+(studioResolving?'<p class="note" role="status" aria-live="polite">Resolving Spotify links '+studioLinkProgress.done+' / '+studioLinkProgress.total+'…</p>':'')+'<p class="cf-provider"><a href="https://musiclink.one/" target="_blank" rel="noopener noreferrer">Track metadata by MusicLink</a></p></div>'+
- '<div class="panel studio-main flow-tracks-panel"><div class="compact-header"><div><div class="eyebrow">02 / MATCHED MUSIC</div><h2>'+tracks.length+' songs</h2></div><div class="row"><button class="btn" id="studioSync" '+(studioRunning||studioResolving||!remaining?'disabled':'')+'>'+(studioRunning?'SEARCHING…':'MATCH NEXT 10')+'</button><button class="btn primary" id="studioExport" '+(studioRunning||studioResolving||studioExporting||!ready.length?'disabled':'')+'>CREATE BEATPORT PLAYLIST</button></div></div>'+
+ '<div class="panel studio-main flow-tracks-panel"><div class="compact-header"><div><div class="eyebrow">02 / MATCHED MUSIC</div><h2>'+tracks.length+' songs</h2></div><div class="row"><button class="btn" id="studioSync" '+(studioRunning||studioResolving||!resumable?'disabled':'')+'>'+(studioRunning?'SEARCHING…':'CONTINUE NEXT 10')+'</button><button class="btn primary" id="studioExport" '+(studioRunning||studioResolving||studioExporting||!ready.length?'disabled':'')+'>CREATE BEATPORT PLAYLIST</button></div></div>'+
  '<p class="note">Selected: '+selected.length+' songs · '+ready.length+' ready to add to a new Beatport playlist.</p>'+
  '<div class="compact-summary"><span><b>'+exact+'</b> auto</span><span><b>'+review+'</b> review</span><span><b>'+remaining+'</b> pending</span><span><b>'+ready.length+'</b> ready</span></div>'+
  '<button class="btn studio-select-all" id="studioSelectAll">'+(allChecked?'DESELECT ALL':'SELECT ALL')+'</button>'+
@@ -440,7 +444,7 @@ async function studioSync(ids){
   (!t.studioResult||t.studioResult==='error'||
   (['exact','id_ready','manual'].includes(t.studioResult)&&
    (globalThis.CrateflowMix.bpmValue(t.bpm)===null||!globalThis.CrateflowMix.parseKey(t.key)||!String(t.genre||'').trim())&&
-   t.djEnrichment?.status!=='unavailable'))).slice(0,10).map(t=>t.id);
+   !t.djEnrichment?.checkedAt))).slice(0,10).map(t=>t.id);
  if(!pool.length)return toast('No pending matching or enrichment work');
  await runAutoPipeline(pool,10);
 }
