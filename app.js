@@ -98,17 +98,25 @@ function refreshStoredMatches(){
  if(changed)persist();
 }
 function enrichTrackDjMetadata(t,candidate){
+ // DJ enrichment is optional and MUST NEVER interrupt core Beatport matching.
+ const mix=globalThis.CrateflowMix;
+ if(!mix||typeof mix.bpmValue!=='function'||typeof mix.parseKey!=='function')return false;
  if(!candidate?.assessment?.autoEligible)return false;
- let changed=false;
- const bpm=globalThis.CrateflowMix.bpmValue(candidate.bpm);
- if(globalThis.CrateflowMix.bpmValue(t.bpm)===null&&bpm!==null){
-  t.bpm=bpm;t.bpmSource='musicapi-beatport';changed=true;
+ try{
+  let changed=false;
+  const bpm=mix.bpmValue(candidate.bpm);
+  if(mix.bpmValue(t.bpm)===null&&bpm!==null){
+   t.bpm=bpm;t.bpmSource='musicapi-beatport';changed=true;
+  }
+  const key=mix.parseKey(candidate.key);
+  if(!mix.parseKey(t.key)&&key){
+   t.key=key;t.keySource='musicapi-beatport';changed=true;
+  }
+  return changed;
+ }catch(error){
+  console.warn('Optional DJ metadata enrichment skipped',error);
+  return false;
  }
- const key=globalThis.CrateflowMix.parseKey(candidate.key);
- if(!globalThis.CrateflowMix.parseKey(t.key)&&key){
-  t.key=key;t.keySource='musicapi-beatport';changed=true;
- }
- return changed;
 }
 function bestExactCandidate(t,candidates){
  return globalThis.CrateflowMatching.bestAutomatic(t,candidates,state.settings.preferExtended);
