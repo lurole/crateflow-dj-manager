@@ -1,0 +1,146 @@
+/*
+ CRATEFLOW TYPOGRAPHY SYSTEM / hierarchy study
+ Inspired by Mitya Andrievskiy's Hierarchy 2024 exploration.
+ Exact typeface is not identified in the Dribbble reference.
+ Uses open-licensed Inter Tight as a consistent typographic interpretation.
+ Usage: loaded last on all public + authenticated app pages.
+ Palette remains Soft Sand / Mocha Green.
+*/
+:root{
+ --cf-type:'Inter Tight','Arial Narrow',Arial,sans-serif;
+ --cf-type-display:900;
+ --cf-type-title:800;
+ --cf-type-label:750;
+ --cf-type-body:450;
+}
+html,body,body :where(*):not(svg):not(path):not(circle):not(rect):not(line):not(polyline):not(polygon):not(ellipse){
+ font-family:var(--cf-type)!important;
+}
+body{font-optical-sizing:auto;font-synthesis:weight style}
+body p,body input,body textarea,body select,body option{
+ font-weight:var(--cf-type-body);
+ letter-spacing:-.005em;
+}
+body button,body a,body label,body small{
+ font-kerning:normal;
+}
+body b,body strong{font-weight:var(--cf-type-title)}
+/* Statement typography: tall, compact and densely set, but readable on mobile. */
+.af-landing .af-hero-content h1{
+ font-weight:var(--cf-type-display)!important;
+ letter-spacing:-.075em!important;
+ line-height:.99!important;
+ text-wrap:balance;
+}
+.af-landing .af-hero-content h1 em{
+ font-family:var(--cf-type)!important;
+ font-weight:800!important;
+ font-style:italic;
+ letter-spacing:-.079em!important;
+}
+.af-landing .af-workflow h2,
+.af-landing .af-end h2{
+ font-weight:var(--cf-type-display)!important;
+ line-height:.99!important;
+ letter-spacing:-.067em!important;
+}
+.af-landing .af-workflow h2 em{
+ font-family:var(--cf-type)!important;
+ font-weight:800!important;
+ font-style:italic;
+}
+.af-landing .af-brand,
+body:not(.landing-mode) .shell>aside .logo{
+ font-weight:900!important;
+ letter-spacing:-.055em!important;
+}
+.af-landing .af-top-pill,
+.af-landing .af-section-label,
+.af-landing .af-import-form label,
+.af-landing .af-nav nav a,
+.af-landing .af-service-item small,
+.af-landing .af-step>span:first-child,
+.af-landing .af-end-cta,
+.af-landing .af-nav-cta,
+.af-landing .af-footer{
+ font-weight:750!important;
+ letter-spacing:.11em;
+}
+.af-landing .af-step h3,
+.af-landing .af-service-item strong{
+ font-weight:850!important;
+ letter-spacing:-.045em!important;
+}
+.af-landing .af-hero-content>p,
+.af-landing .af-step p,
+.af-landing .af-end p{
+ font-weight:450!important;
+ letter-spacing:-.005em;
+}
+body:not(.landing-mode) #view h1,
+body:not(.landing-mode) #view .flow-hero-copy h1{
+ font-weight:900!important;
+ letter-spacing:-.073em!important;
+ line-height:1.01!important;
+}
+body:not(.landing-mode) #view h2,
+body:not(.landing-mode) #view .flow-workspace-heading h2{
+ font-weight:850!important;
+ letter-spacing:-.06em!important;
+ line-height:1.07!important;
+}
+body:not(.landing-mode) #view h3{
+ font-weight:800!important;
+ letter-spacing:-.035em!important;
+}
+body:not(.landing-mode) #view .card strong,
+body:not(.landing-mode) #view .studio-metrics strong,
+body:not(.landing-mode) #view .compact-summary b{
+ font-weight:850!important;
+ letter-spacing:-.055em!important;
+}
+body:not(.landing-mode) #view .compact-name strong,
+body:not(.landing-mode) #view td strong{
+ font-weight:750!important;
+ letter-spacing:-.025em;
+}
+body:not(.landing-mode) #view p,
+body:not(.landing-mode) #view .note,
+body:not(.landing-mode) #view .compact-name small{
+ font-weight:450!important;
+ line-height:1.65;
+}
+body:not(.landing-mode) #view .eyebrow,
+body:not(.landing-mode) #view .label,
+body:not(.landing-mode) #view .pill,
+body:not(.landing-mode) .shell>aside nav button,
+body:not(.landing-mode) main>header,
+body:not(.landing-mode) #view th{
+ font-weight:750!important;
+ letter-spacing:.11em;
+}
+body:not(.landing-mode) #view .btn{
+ font-weight:750!important;
+ letter-spacing:.055em;
+}
+body:not(.landing-mode) #view input,
+body:not(.landing-mode) #view textarea,
+body:not(.landing-mode) #view select{
+ font-weight:450!important;
+ letter-spacing:0;
+}
+@media(max-width:620px){
+ .af-landing .af-hero-content h1{
+   font-size:clamp(43px,10.1vw,64px)!important;
+   line-height:1.05!important;
+   letter-spacing:-.066em!important;
+ }
+ .af-landing .af-workflow h2,
+ .af-landing .af-end h2{line-height:1.04!important}
+ body:not(.landing-mode) #view .flow-hero-copy h1{
+   letter-spacing:-.065em!important;
+ }
+}
+@media(prefers-reduced-motion:reduce){
+ html{scroll-behavior:auto}
+}
