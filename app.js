@@ -190,20 +190,20 @@ function studioView(){
  const row=t=>{
   const result=t.studioResult||'pending',checked=t.studioSelected!==false;
   const matches=t.catalog?.candidates||[];
-  const status=result==='exact'?'AUTO MATCH':result==='id_ready'?'AUTO MATCH · ID':
-    result==='manual'?'USER SELECTED':result==='review'?'REVIEW NEEDED':
-    result==='missing_url'?'ID MISSING':result==='error'?'SEARCH ERROR':'PENDING';
+  const status=['exact','id_ready','manual'].includes(result)?'FOUND':
+    result==='review'?'CHECK TRACK':result==='missing_url'?'CHECK TRACK':
+    result==='error'?'SEARCH FAILED':'SEARCHING';
   const selectedMatch=['exact','id_ready','manual'].includes(result)?t.studioCandidate:null;
   const selectedInfo=selectedMatch?
-    '<div class="compact-match-note"><span>'+esc(selectedMatch.name||'Beatport track')+' · '+esc(selectedMatch.assessment?.candidateVersion||selectedMatch.mixHint||'Version unspecified')+
-    ' · '+esc(selectedMatch.score)+'% metadata</span><button class="btn" data-act="studioChange" data-id="'+t.id+'">CHANGE</button></div>':'';
+    '<div class="compact-match-note"><span>'+esc(selectedMatch.name||t.title)+'</span><button class="btn" data-act="studioChange" data-id="'+t.id+'">CHANGE</button></div>':'';
+  // Only exceptions need a decision. Hide internal metadata percentages and
+  // scoring reasons: they are matching safeguards, not useful DJ-facing data.
   const reviewOptions=result==='review'?
-    '<div class="compact-options" aria-label="Beatport match candidates for '+esc(t.title)+'">'+
+    '<div class="compact-options" aria-label="Choose the correct Beatport track for '+esc(t.title)+'">'+
     (matches.length?matches.slice(0,1).map((m,i)=>
-      '<div class="compact-option"><span><strong>'+esc(m.name)+'</strong><small>'+esc(m.artist)+' · '+esc(m.assessment?.candidateVersion||m.mixHint||'Version unspecified')+
-      ' · '+esc(m.score)+'% metadata</small><small class="compact-reason">'+esc(m.assessment?.reason||'Review before selecting')+'</small></span>'+
-      '<button class="btn" data-act="studioChoose" data-id="'+t.id+'" data-index="'+i+'" '+(!m.externalId?'disabled title="Beatport playlist ID unavailable"':'')+'>SELECT</button></div>'
-    ).join(''):'<div class="compact-option"><span><strong>No catalog candidates found.</strong><small>Try searching again or verify the song on Beatport.</small></span></div>')+
+      '<div class="compact-option"><span><strong>'+esc(m.name)+'</strong><small>'+esc(m.artist)+'</small></span>'+
+      '<button class="btn" data-act="studioChoose" data-id="'+t.id+'" data-index="'+i+'" '+(!m.externalId?'disabled title="Beatport track unavailable"':'')+'>USE THIS TRACK</button></div>'
+    ).join(''):'<div class="compact-option"><span><strong>Track not found on Beatport.</strong></span></div>')+
     '<div class="compact-review-actions"><button class="btn" data-act="studioRetry" data-id="'+t.id+'" '+(studioRunning?'disabled':'')+'>SEARCH AGAIN</button></div></div>':'';
   const retryOption=result==='error'?'<div class="compact-review-actions"><button class="btn" data-act="studioRetry" data-id="'+t.id+'" '+(studioRunning?'disabled':'')+'>RETRY</button></div>':'';
   return '<div class="compact-track"><input class="compact-check" type="checkbox" data-id="'+t.id+'" aria-label="Select '+esc(t.title)+'" '+(checked?'checked':'')+'>'+
@@ -227,7 +227,7 @@ function studioView(){
  '<div class="panel studio-main flow-import-panel"><div class="eyebrow">01 / COPY & PASTE TRACKS</div><p class="note cf-paste-help">Paste Spotify song or playlist URLs, or Artist – Title lines. Import & Match automatically resolves Spotify tracks, matches Beatport and enriches BPM, genre and Camelot key through API.SH when available. API.SH queries consume credits (up to 40 per import); large playlists can be continued in batches. Keep this tab open until processing finishes.</p><textarea id="studioPaste" class="field" rows="5" placeholder="https://open.spotify.com/track/5KBUE75BEZMGmDnfW8y2gd&#10;Adriatique – Closer (Extended Mix)">'+esc(studioInput)+'</textarea><div class="row gap"><button class="btn primary" id="studioImport" '+(studioRunning||studioResolving?'disabled':'')+'>'+(studioResolving?'IMPORTING TRACKS…':studioRunning?'MATCHING & ENRICHING…':'IMPORT & MATCH')+'</button><button class="btn" id="uploadCsv" '+(studioResolving?'disabled':'')+'>UPLOAD CSV</button><label class="studio-toggle"><input id="studioExtended" type="checkbox" '+(state.settings.preferExtended?'checked':'')+'> Prefer Extended Mix</label></div>'+(studioResolving?'<p class="note" role="status" aria-live="polite">Resolving Spotify links '+studioLinkProgress.done+' / '+studioLinkProgress.total+'…</p>':'')+'<p class="cf-provider"><a href="https://musiclink.one/" target="_blank" rel="noopener noreferrer">Track metadata by MusicLink</a></p></div>'+
  '<div class="panel studio-main flow-tracks-panel"><div class="compact-header"><div><div class="eyebrow">02 / MATCHED MUSIC</div><h2>'+tracks.length+' songs</h2></div><div class="row"><button class="btn" id="studioSync" '+(studioRunning||studioResolving||!resumable?'disabled':'')+'>'+(studioRunning?'SEARCHING…':'CONTINUE NEXT 10')+'</button><button class="btn primary" id="studioExport" '+(studioRunning||studioResolving||studioExporting||!ready.length?'disabled':'')+'>CREATE BEATPORT PLAYLIST</button></div></div>'+
  '<p class="note">Selected: '+selected.length+' songs · '+ready.length+' ready to add to a new Beatport playlist.</p>'+
- '<div class="compact-summary"><span><b>'+exact+'</b> auto</span><span><b>'+review+'</b> review</span><span><b>'+remaining+'</b> pending</span><span><b>'+ready.length+'</b> ready</span></div>'+
+ '<div class="compact-summary"><span><b>'+exact+'</b> found</span><span><b>'+review+'</b> need attention</span><span><b>'+remaining+'</b> pending</span><span><b>'+ready.length+'</b> ready</span></div>'+
  '<button class="btn studio-select-all" id="studioSelectAll">'+(allChecked?'DESELECT ALL':'SELECT ALL')+'</button>'+
  (studioRunning?'<div class="studio-progress"><div style="width:'+percent+'%"></div></div><p class="note" role="status" aria-live="polite">'+esc(studioProgress.phase||'Matching Beatport tracks')+' · '+studioProgress.done+' / '+studioProgress.total+'</p>':'')+
  (studioError?'<p class="studio-error">'+esc(studioError)+'</p>':'')+
