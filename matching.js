@@ -116,21 +116,19 @@
       .sort((a,b)=>b.assessment.rank-a.assessment.rank)
   );
   const bestAutomatic=(track,ranked,preferExtended=true)=>{
-    let choices=(Array.isArray(ranked)?ranked:[]).filter(c=>c.assessment?.autoEligible);
+    const choices=(Array.isArray(ranked)?ranked:[]).filter(c=>c.assessment?.autoEligible);
     if(!choices.length)return null;
-    const requested=sourceVersion(track);
-    if(requested.kind==="unspecified"){
-      // Respect the DJ's extended preference, without treating remixes as interchangeable.
-      const preferredKind=preferExtended?"extended":"original";
-      if(choices.some(c=>c.assessment.versionKind===preferredKind))
-        choices=choices.filter(c=>c.assessment.versionKind===preferredKind);
-      else if(choices.some(c=>c.assessment.versionKind==="unspecified"))
-        choices=choices.filter(c=>c.assessment.versionKind==="unspecified");
-    }
-    const ids=new Set(choices.map(c=>String(c.externalId)));
-    // Two distinct Beatport releases with identical metadata require human review.
-    if(ids.size!==1)return null;
-    return choices[0];
+    // Highest metadata similarity first. Prefer the exact recording (ISRC) in ties.
+    // The requested mix/version and both title and artist must match before auto-selection.
+    const req=sourceVersion(track);
+    const preferredKind=preferExtended?"extended":"original";
+    return choices.slice().sort((a,b)=>{
+      const x=a.assessment,y=b.assessment;
+      const preferred=c=>req.kind==="unspecified"&&c.assessment.versionKind===preferredKind?1:0;
+      return y.score-x.score || Number(y.isrcMatch)-Number(x.isrcMatch) ||
+        preferred(b)-preferred(a) || y.rank-x.rank ||
+        String(a.externalId).localeCompare(String(b.externalId));
+    })[0];
   };
   root.CrateflowMatching=Object.freeze({assess,rankCandidates,bestAutomatic,titleCore,
     sourceVersion,candidateVersion,versionLabel});
