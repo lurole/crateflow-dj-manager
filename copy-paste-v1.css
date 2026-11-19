@@ -23,3 +23,12 @@ body:not(.landing-mode) #view .cf-paste-help strong{
 @media(max-width:620px){
  .af-landing .af-import-row textarea{font-size:12px;height:58px}
 }
+
+/* Transparent metadata attribution and import resolution feedback */
+body:not(.landing-mode) #view .cf-provider{margin:9px 0 0;font-size:10px;line-height:1.6}
+body:not(.landing-mode) #view .cf-provider a{
+ font-family:"neue-haas-grotesk-text",sans-serif!important;
+ color:inherit;text-decoration:underline;text-underline-offset:3px;
+ opacity:.75
+}
+body:not(.landing-mode) #view .cf-provider a:hover{opacity:1}
