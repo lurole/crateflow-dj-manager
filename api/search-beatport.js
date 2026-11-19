@@ -96,7 +96,14 @@ export default async function handler(req,res){
       // Preserve externalId for playlists; expose only a numeric store ID for cart automation.
       const idOptions=[d?.beatportId,d?.beatportTrackId,d?.beatport_id,d?.trackId,d?.externalId,d?.id];
       const beatportId=idOptions.map(x=>String(x??'')).find(x=>/^\d{1,12}$/.test(x))||null;
-      return {name,artist:artists.filter(Boolean).join(', ').slice(0,250),url:/^https:\/\/(www\.)?beatport\.com\/track\//.test(url)?url:null,externalId:String(d?.externalId||d?.id||'').slice(0,80),beatportId,isrc:String(d?.isrc||'').slice(0,40),mixHint:([d?.mixName,d?.mixType,d?.versionName,d?.version,d?.mix].find(v=>typeof v==='string'&&v.trim())||(/extended mix/i.test(name)?'Extended Mix':/radio edit/i.test(name)?'Radio Edit':/original mix/i.test(name)?'Original Mix':'Unspecified')).slice(0,100)};
+      // DJ fields are optional: only accept explicit, plausible values from a matched catalog record.
+      const bpmRaw=[d?.bpm,d?.tempo,d?.beatsPerMinute,d?.beats_per_minute,d?.attributes?.bpm].find(v=>v!==undefined&&v!==null&&v!=='');
+      const bpmNumber=Number(bpmRaw);
+      const bpm=bpmRaw!==undefined&&Number.isFinite(bpmNumber)&&bpmNumber>=40&&bpmNumber<=240?bpmNumber:null;
+      const keyRaw=[d?.camelotKey,d?.camelot,d?.musicalKey,d?.musical_key,d?.keyName,d?.key?.name,d?.key?.camelot,d?.key,d?.attributes?.key]
+       .find(v=>typeof v==='string'&&v.trim().length>0);
+      const key=typeof keyRaw==='string'?keyRaw.trim().slice(0,50):null;
+      return {bpm,key,name,artist:artists.filter(Boolean).join(', ').slice(0,250),url:/^https:\/\/(www\.)?beatport\.com\/track\//.test(url)?url:null,externalId:String(d?.externalId||d?.id||'').slice(0,80),beatportId,isrc:String(d?.isrc||'').slice(0,40),mixHint:([d?.mixName,d?.mixType,d?.versionName,d?.version,d?.mix].find(v=>typeof v==='string'&&v.trim())||(/extended mix/i.test(name)?'Extended Mix':/radio edit/i.test(name)?'Radio Edit':/original mix/i.test(name)?'Original Mix':'Unspecified')).slice(0,100)};
     }).filter(c=>c.name);
     if(raw.length>0&&!candidates.length){
       return res.status(502).json({ok:false,error:'MusicAPI returned records, but CRATEFLOW could not read their track fields.',diagnostic:'unrecognized_tracks',recordCount:raw.length});
