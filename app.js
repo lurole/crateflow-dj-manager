@@ -182,7 +182,7 @@ function studioView(){
  '<div class="flow-hero-bottom"><span>MADE FOR THE WAY YOU LISTEN</span><span class="flow-scroll">SCROLL TO WORKSPACE ↓</span></div></section>'+
  '<div class="flow-workspace-heading"><span>THE WORKSPACE / 001</span><h2>MAKE IT FLOW<span>.</span></h2><p>Import your music. Find the right match. Build your next Beatport playlist.</p></div>'+
  '<div class="studio-status"><span class="pill">NO SPOTIFY LOGIN REQUIRED</span><span class="pill '+(beatport?'':'pending')+'">Beatport '+(beatport?'verified':'not connected')+'</span><button class="btn" data-page="welcome">BEATPORT CONNECTION</button></div>'+
- '<div class="panel studio-main flow-import-panel"><div class="eyebrow">01 / COPY & PASTE TRACKS</div><p class="note cf-paste-help">Paste Artist – Title lines or Title + Artist columns. No Spotify login required. Paste individual Spotify track URLs, Artist – Title lines, or two spreadsheet columns. Links are resolved via MusicLink when the API is configured. Playlist URLs are not supported.</p><textarea id="studioPaste" class="field" rows="5" placeholder="https://open.spotify.com/track/5KBUE75BEZMGmDnfW8y2gd&#10;Adriatique – Closer (Extended Mix)">'+esc(studioInput)+'</textarea><div class="row gap"><button class="btn primary" id="studioImport" '+(studioRunning||studioResolving?'disabled':'')+'>'+(studioResolving?'RESOLVING LINKS…':'IMPORT & MATCH')+'</button><button class="btn" id="uploadCsv" '+(studioResolving?'disabled':'')+'>UPLOAD CSV</button><label class="studio-toggle"><input id="studioExtended" type="checkbox" '+(state.settings.preferExtended?'checked':'')+'> Prefer Extended Mix</label></div>'+(studioResolving?'<p class="note" role="status" aria-live="polite">Resolving Spotify links '+studioLinkProgress.done+' / '+studioLinkProgress.total+'…</p>':'')+'<p class="cf-provider"><a href="https://musiclink.one/" target="_blank" rel="noopener noreferrer">Track metadata by MusicLink</a></p></div>'+
+ '<div class="panel studio-main flow-import-panel"><div class="eyebrow">01 / COPY & PASTE TRACKS</div><p class="note cf-paste-help">Paste Artist – Title lines or Title + Artist columns. No Spotify login required. Paste individual Spotify track URLs, Artist – Title lines, or two spreadsheet columns. Links are resolved via MusicLink when the API is configured. Spotify playlist URLs are imported via MusicAPI; individual Spotify track URLs use MusicLink (public playlists only, up to 500 entries per playlist).</p><textarea id="studioPaste" class="field" rows="5" placeholder="https://open.spotify.com/track/5KBUE75BEZMGmDnfW8y2gd&#10;Adriatique – Closer (Extended Mix)">'+esc(studioInput)+'</textarea><div class="row gap"><button class="btn primary" id="studioImport" '+(studioRunning||studioResolving?'disabled':'')+'>'+(studioResolving?'RESOLVING LINKS…':'IMPORT & MATCH')+'</button><button class="btn" id="uploadCsv" '+(studioResolving?'disabled':'')+'>UPLOAD CSV</button><label class="studio-toggle"><input id="studioExtended" type="checkbox" '+(state.settings.preferExtended?'checked':'')+'> Prefer Extended Mix</label></div>'+(studioResolving?'<p class="note" role="status" aria-live="polite">Resolving Spotify links '+studioLinkProgress.done+' / '+studioLinkProgress.total+'…</p>':'')+'<p class="cf-provider"><a href="https://musiclink.one/" target="_blank" rel="noopener noreferrer">Track metadata by MusicLink</a></p></div>'+
  '<div class="panel studio-main flow-tracks-panel"><div class="compact-header"><div><div class="eyebrow">02 / MATCHED MUSIC</div><h2>'+tracks.length+' songs</h2></div><div class="row"><button class="btn" id="studioSync" '+(studioRunning||studioResolving||!remaining?'disabled':'')+'>'+(studioRunning?'SEARCHING…':'MATCH NEXT 10')+'</button><button class="btn primary" id="studioExport" '+(studioRunning||studioResolving||studioExporting||!ready.length?'disabled':'')+'>CREATE BEATPORT PLAYLIST</button></div></div>'+
  '<p class="note">Selected: '+selected.length+' songs · '+ready.length+' ready to add to a new Beatport playlist.</p>'+
  '<div class="compact-summary"><span><b>'+exact+'</b> auto</span><span><b>'+review+'</b> review</span><span><b>'+remaining+'</b> pending</span><span><b>'+ready.length+'</b> ready</span></div>'+
@@ -200,7 +200,36 @@ async function importTextRows(input,name='Quick Import',progress=()=>{}){
  const trackLinks=parsed.blockedLinks.filter(link=>link.kind==='track');
  const playlists=parsed.blockedLinks.filter(link=>link.kind==='playlist');
  const unknown=parsed.blockedLinks.filter(link=>link.kind==='unsupported');
- if(playlists.length)warnings.push(playlists.length+' Spotify playlist URL(s) skipped: only individual track links are supported.');
+ if(playlists.length>3)warnings.push((playlists.length-3)+' additional playlists not processed (limit: 3 per import).');
+ for(const [pIndex,playlist] of playlists.slice(0,3).entries()){
+  let cursor=null,pages=0,seenCursors=new Set(),loaded=0,failedPlaylist=false;
+  do{
+   progress(pIndex*10+pages+1,Math.min(playlists.length,3)*10);
+   try{
+    const response=await fetch('/api/resolve-spotify-playlist',{
+     method:'POST',headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({id:playlist.id,...(cursor?{nextParam:cursor}:{})})
+    });
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok||!result.ok||!Array.isArray(result.tracks)){
+     warnings.push('Playlist '+(pIndex+1)+': '+String(result.error||'MusicAPI unavailable').slice(0,150));
+     failedPlaylist=true;break;
+    }
+    rows.push(...result.tracks);loaded+=result.tracks.length;
+    if(result.skipped?.unavailable||result.skipped?.incomplete)
+     warnings.push('Playlist '+(pIndex+1)+': '+((result.skipped.unavailable||0)+(result.skipped.incomplete||0))+' unavailable or incomplete tracks skipped on page '+(pages+1)+'.');
+    cursor=result.nextParam||null;pages++;
+    if(cursor){
+     if(seenCursors.has(cursor)){warnings.push('Playlist '+(pIndex+1)+': repeated pagination cursor.');failedPlaylist=true;break}
+     seenCursors.add(cursor);
+    }
+   }catch{
+    warnings.push('Playlist '+(pIndex+1)+': MusicAPI request failed.');failedPlaylist=true;break;
+   }
+  }while(cursor&&pages<10);
+  if(cursor&&pages>=10)warnings.push('Playlist '+(pIndex+1)+': first 500 entries processed; remaining entries not imported.');
+  if(failedPlaylist&&loaded)warnings.push('Playlist '+(pIndex+1)+': only '+loaded+' accessible tracks were loaded.');
+ }
  if(unknown.length)warnings.push(unknown.length+' unsupported URL(s) skipped.');
  if(parsed.missingArtist.length)warnings.push(parsed.missingArtist.length+' track name(s) without an artist were skipped.');
  let resolved=0,failed=0,notConfigured=false;
@@ -239,13 +268,13 @@ async function importTextRows(input,name='Quick Import',progress=()=>{}){
  const added=rows.length?importTracks(rows,name):0;
  if(notConfigured&&batch.length>1)warnings.push('Other Spotify links were not processed.');
  return {added,resolved,failed,linkCount:trackLinks.length,message:warnings.join(' '),
-  hasUnresolved:failed>0||notConfigured||trackLinks.length>batch.length||playlists.length>0||unknown.length>0||parsed.missingArtist.length>0};
+  hasUnresolved:failed>0||notConfigured||trackLinks.length>batch.length||playlists.length>3||warnings.length>0||unknown.length>0||parsed.missingArtist.length>0};
 }
 async function studioImport(){
  if(studioRunning||studioResolving)return;
  const input=$('#studioPaste')?.value||studioInput||'';
  studioInput=input;
- if(!input.trim())return toast('Paste Spotify track URLs or Artist – Title lines first.');
+ if(!input.trim())return toast('Paste a Spotify playlist link, track link or Artist – Title lines first.');
  studioError='';studioResolving=true;studioLinkProgress={done:0,total:0};render();
  let result;
  try{
