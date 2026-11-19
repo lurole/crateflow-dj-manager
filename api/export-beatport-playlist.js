@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import '../matching.js';
 export const maxDuration=30;
 // Explicit user action only. Creates a Beatport playlist; DOES NOT change the shopping cart.
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -30,6 +31,7 @@ export default async function handler(req,res){
     !submitted.every((t,i)=>t&&typeof t==='object'&&String(t.id||'')===ids[i]&&
        typeof t.title==='string'&&t.title.trim().length>0&&t.title.length<=220&&
        typeof t.artist==='string'&&t.artist.trim().length>0&&t.artist.length<=250&&
+       (t.remix===undefined||(typeof t.remix==='string'&&t.remix.length<=100))&&
        (!t.isrc||validateISRC(String(t.isrc).toUpperCase()))
     )))return res.status(400).json({ok:false,error:'Invalid track verification metadata'});
  if(!Array.isArray(ids)||ids.length<1||ids.length>20||!title)return res.status(400).json({ok:false,error:'Choose 1 to 20 confirmed tracks'});
@@ -100,10 +102,16 @@ export default async function handler(req,res){
     notUsed.delete(found);
     const item=actual[found];
     if(request){
-     const reqISRC=String(request.isrc||'').toUpperCase(),actualISRC=String(item?.isrc||'').toUpperCase();
-     // The same numeric ID cannot mask a conflicting recording identifier.
-     identityOK=!(validateISRC(reqISRC)&&validateISRC(actualISRC)&&reqISRC!==actualISRC);
-    }else identityOK=true;
+     const artists=Array.isArray(item?.artists)?item.artists.map(a=>typeof a==='string'?a:a?.name).filter(Boolean):[];
+     const assessment=globalThis.CrateflowMatching.assess(
+      {title:request.title,artist:request.artist,remix:request.remix||'',isrc:request.isrc||''},
+      {name:item?.name||'',artist:artists.join(', '),artistNames:artists,
+       externalId:item?.id||id,isrc:item?.isrc||''}
+     );
+     // Neither a matching ID nor a successful playlist write can disguise a wrong version,
+     // an artist mismatch or a conflicting recording identifier.
+     identityOK=assessment.autoEligible;
+    }else identityOK=false;
     if(identityOK)confirmed.push(id);
     else mismatched.push(id);
    }else missing.push(id);
