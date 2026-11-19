@@ -1,90 +1,49 @@
-# CRATEFLOW — DJ Music Manager
+# CRATEFLOW — DJ Music Workflow
 
-## Beatport Matching — current implementation
+A lightweight web workspace for DJs to bring their own track lists into a Beatport matching and playlist workflow.
 
-**Current workflow:** Import Spotify tracks/playlists, connect Beatport via MusicAPI, and use **IMPORT & MATCH** or **MATCH NEXT 10** in the workspace. Each search is explicitly user-initiated (or follows an explicit import action). MusicAPI requests may consume account quota.
+## Current MVP — no Spotify login
 
-**Version-aware matching (2026-11):** `matching.js` compares normalized track titles, complete artist strings, explicit Original/Extended/Radio/Club/Dub/Live/Edit mix labels, and named remixers. When both sources provide ISRC, conflicts prevent automatic selection. The optional **Prefer Extended Mix** setting ranks Extended Mixes ahead of Original Mixes when the source track does not specify a version.
+The user-facing Spotify OAuth login and Spotify Web API import have been **removed** from the MVP to avoid depending on restricted Spotify user authorization. The app **does not** fetch the tracks behind Spotify track/playlist URLs.
 
-CRATEFLOW **automatically selects only a unique, unambiguous candidate with a MusicAPI playlist track ID** and matching title, artist and version. Conflicting remixes, uncertain metadata, duplicate catalog releases, missing IDs and differing ISRC values require review. Up to four candidates display their mix version, metadata-similarity percentage and reason for review. Users can select a candidate, retry the search or change a selection. Heuristic percentages **do not guarantee** that a Beatport release is identical to a Spotify recording.
+Supported input:
 
-Existing cached automatic matches are re-evaluated when the application opens or mix preference changes; any previously overconfident unexported match is moved back to review. Already manually approved matches and previously exported playlists are not retroactively altered.
+1. Paste one song per line: `Artist – Title` (example: `Adriatique – Closer (Extended Mix)`).
+2. Paste spreadsheet columns separated by tabs: `Title<TAB>Artist`.
+3. Paste CSV text with a `title,artist` header or use **UPLOAD CSV** (case-insensitive CSV file headers: title/track/track name and artist/artists/artist name).
 
-**Run regression tests:** `npm test` (Node 18+; no extra dependencies). The suite covers wrong versions, named remixes, ambiguous releases and ISRC mismatches. No live MusicAPI credentials are necessary for these unit tests.
+Unresolvable Spotify links, unsupported URLs and lines without an artist are **not** silently imported. The workspace shows a warning. In the Spotify desktop app, `Ctrl+A` and `Ctrl+C` can copy track links rather than artist/title text: that clipboard format cannot yet be processed without a separate authorized metadata integration or an exported table. The app must not claim to support URL-only imports.
 
-The actual connected-account MusicAPI lookup returns sanitized candidate metadata. The API request is still rate-limited and cost-gated by server configuration. Live provider response coverage and real end-to-end playlist export require testing against an authorized Beatport connection; these tests are **not** simulated by the unit suite.
+## Matching and Beatport playlist export
 
+Connect a Beatport account via MusicAPI when ready to match songs. `MUSICAPI_ENABLE_VERIFICATION=true` and valid server-side `MUSICAPI_CLIENT_ID`/`MUSICAPI_CLIENT_SECRET` are required. Provider account lookups are gated; there is basic per-instance throttling that is not sufficient for unrestricted public access.
 
-Browser-based DJ music management prototype. Live Spotify playlist metadata import via OAuth PKCE, CSV import, local music library, Beatport search queue, purchase/download status tracking, and Rekordbox XML export.
+The local `matching.js` engine ranks candidates by track title, artist, mix/version and optional ISRC. Remixes and versions are not interchangeable. Ambiguous or incomplete matches require explicit review. Metadata percentages are heuristic, not guarantees of the exact recording or purchase availability.
 
-## Deployment
-Import this repository into https://vercel.com/new as Framework Preset **Other**, root directory **.**, and no build command. The app is static HTML/CSS/JS. Every push to main will deploy automatically once linked.
+Creating a Beatport playlist is an explicit user action that submits selected MusicAPI track identifiers. It does **not** buy music, add to a cart or automatically download audio files.
 
-In Spotify Developer Dashboard, add your **exact** Vercel URL including the final slash to Redirect URIs, e.g. https://crateflow-example.vercel.app/. Spotify requires an authorized app and may limit API access under Development Mode.
+## Storage and data protection
 
-## Local
-Run `npm start` with Node 18+ and visit http://127.0.0.1:5173/. Add that exact URL to Spotify Redirect URIs for local OAuth.
+Tracks, playlists, status, matching history and file paths are currently saved in this browser's `localStorage` under `crateflow_v1`. They do not sync across devices. Export JSON backups regularly. Audio files are never collected or hosted. Beatport verification uses an expiring signed HttpOnly cookie; this is not a production multi-user login or account system.
 
-## Limitations
-Track metadata are saved in browser localStorage, not synced across devices. Spotify tokens are in sessionStorage, no client secret is used. Beatport search opens manually and **does not** place items in the actual cart or automate purchases/downloads. Track statuses are local only. For Rekordbox XML, input **real absolute paths** for legally acquired local audio files; missing paths cannot be discovered by a browser. BPM and key are manual. Export JSON backups regularly.
+Before public launch: provision dedicated user authentication, cloud database with row-level access control, durable quotas/rate limiting, secure per-user account binding, terms/privacy disclosures, and commercial integration rights.
 
-## Match & Sync (phase 1)
-Open **Match & Sync** in the left sidebar. For each imported track:
-1. Open a Beatport search.
-2. Verify the release and mix on Beatport.
-3. Paste the exact `https://www.beatport.com/track/slug/12345` URL and candidate details.
-4. Save and score the match. The displayed score is a locally computed heuristic only.
-5. Add the track to your real Beatport cart yourself, then click **I ADDED TO BEATPORT CART** to record confirmation.
+## Local development
 
-A local activity history records searches, confirmed matches, and cart acknowledgements. It can be exported as JSON. The **Prefer Extended Mix** setting influences search wording and candidate score. This phase does not scrape the Beatport catalog, log in to Beatport or add items to the Beatport cart automatically.
+Requires Node 18+:
 
-Planned phase 2: user-controlled Chrome extension for supported Beatport storefront actions, after validating live DOM and allowed permissions. Never treat local cart status as real-time confirmation of a remote cart.
+```bash
+npm start
+npm test
+npm run build
+```
 
-## First-time onboarding (v0.3)
-New browser users are shown **Get Started**, a simplified Spotify and Beatport connection screen, with direct progression to **Import Music**. Advanced developer settings (Spotify Client ID, MusicAPI account slug) are inside a collapsible advanced section, not part of the primary user journey. The shared MusicAPI account slug is initialized to the application's developer slug; users do **not** need MusicAPI accounts or keys.
+Local server: http://127.0.0.1:5173/. No Spotify Developer Dashboard or redirect URI configuration is needed for the current MVP.
 
-Beatport login is initiated by a hosted MusicAPI page, and the optional verification API remains cost-gated using `MUSICAPI_ENABLE_VERIFICATION`. This beta only stores a session-level verified indicator and does not support real multi-user accounts, durable OAuth connections, cloud sync, or automatic Beatport cart mutations. Spotify API app development restrictions still apply.
+Deploy with Vercel using the Git-linked repository. `build.js` bundles the static frontend to `dist/`; backend API routes are deployed as functions. The source files `clipboard-import.js`, `matching.js` and their suites are dependency-free.
 
-Before public launch: implement user authentication and secure session binding for MusicAPI auth attempts, durable per-user connections and catalog data, billing controls, and authorized Beatport cart access. Never store a MusicAPI secret or Beatport password in browser-accessible code.
+## External platform compliance
 
-## Automatic Beatport sign-in verification (v0.3.1)
-The MusicAPI sign-in callback now automatically invokes `/api/verify-beatport` when it contains a valid Beatport success response and expected identifiers. During verification the onboarding screen shows a pending state. A verified response with `service: 'beatport'` marks the current browser session as connected; failures show a retry button, without falsely claiming a connection. No second user confirmation click is required for a successful return. The existing server-side feature flag `MUSICAPI_ENABLE_VERIFICATION=true` must remain enabled for this beta feature to operate, and any API charge must be considered.
+No Spotify Web API, oEmbed fallback, web scraping or unauthenticated Spotify metadata lookups are used in this MVP. This avoids pretending that URL parsing can replace authorized track metadata access. Any future automated interpretation of Spotify links requires validating the applicable API and commercial terms.
 
-This connection status is limited to the current browser session. Production-grade multi-user identity binding, durable account sessions, and Beatport cart write operations remain unimplemented.
-
-## MusicAPI Beatport Catalog Lookup (v0.4 prototype)
-In **Match & Sync**, click **AUTO SEARCH** for one track or **SEARCH NEXT 5 VIA MUSICAPI** for a confirmed batch of up to five unchecked tracks. Browser calls `POST /api/search-beatport`; the server makes a single `POST https://api.musicapi.com/public/search` request per track with `type:track` and `sources:["beatport"]`, using the server's MusicAPI Client ID as a catalog token. No client secret, Beatport user token, cart operation or payment is required. Responses are sanitized before returning to the browser.
-The provider can return a catalog candidate or a `not_found` or `error` status. The score shown is CRATEFLOW's *local heuristic*, not a provider confidence guarantee. Users must review and approve the correct mix and track; approval stores metadata locally, it does not add it to the actual Beatport cart.
-The endpoint is enabled only if `MUSICAPI_ENABLE_VERIFICATION=true`. Search actions can consume API usage and are not called automatically on page load. There is a basic per-process rate limit (12 requests/minute/IP), which is **not sufficient** to protect a public paid API. For multi-user production, require user authentication, a server-side authorization check, durable distributed rate limiting, request quotas, billing safeguards and account isolation.
-If MusicAPI responds with unsupported service or catalog errors, the user can continue with the existing manual Beatport search. The catalog response may contain only one result per source, so Extended/Original Mix variants are not comprehensively enumerated here.
-
-## Unified Import & Match UX (v0.5)
-The main navigation now uses **Import & Sync** as a single screen. Users paste Spotify track/playlist URLs or copied song lines; **IMPORT & MATCH** imports and immediately starts matching up to 10 pending tracks if Beatport is connected. Existing library tracks can also be matched from the same screen. Running progress, concise statuses and match results remain visible together, with no modal confirmation for every track.
-
-Automatic candidate selection considers only **100% text-similarity heuristic** scores. A valid Beatport track URL is required to mark a track selected and linked. A candidate with a 100% score but no Beatport URL is shown as **100% · link needed** and cannot be sent to a cart; it is a *metadata match*, not a confirmed purchasable item. Lower-scoring results require user selection. Exact scores do not prove ISRC, release, version or ownership.
-
-**No automatic Beatport cart operation is implemented.** The current workflow handles import, MusicAPI search and local match selection, not checkout sync. MusicAPI queries may count against API usage. Ten requests per explicit import/match action are capped to limit usage. Production-grade budgets and server rate limiting must be added before general public use.
-
-## Beatport playlist handoff (v0.6)
-CRATEFLOW now supports a **user-triggered** transfer to a real Beatport playlist using MusicAPI, as the nearest documented alternative to an unavailable public cart-write API. After matching, click **CREATE BEATPORT PLAYLIST** in Import & Sync. This sends up to 20 unique matched Beatport `externalId` track IDs to a server-side Vercel function. The function verifies the session cookie and creates a private playlist using `POST /api/{integrationUserUUID}/playlists`, then adds the tracks through `POST /api/{integrationUserUUID}/playlists/{playlistId}/items`, with the confidential MusicAPI client secret only on the server. On success the interface explicitly reports playlist creation, not cart success.
-
-IMPORTANT: MusicAPI's playlist write does **not** update Beatport's checkout cart. A user must open Beatport, find the new playlist and click Beatport's **Add to Cart** / **Buy All** control themselves. The API response has not been tested against a live Beatport playlist in this release. A partial failure can leave a playlist created but empty; check Beatport before retrying to avoid duplicate playlists.
-
-Beatport confirms that its DJ App has a playlist-level Add to Cart function with a 100-track cart limit: https://support.beatport.com/hc/en-us/articles/30542592676500-Can-I-purchase-tracks-using-the-DJ-App . The MusicAPI playlist endpoints are documented at https://musicapi.com/docs/endpoints/create-playlist and https://musicapi.com/docs/endpoints/add-items-to-playlist .
-
-This remains a single-browser beta and is **not** ready for multi-user production writes until authenticated per-user sessions, distributed quotas, a durable export ledger, CSRF token management, and provider permission checks are implemented.
-
-## Current workflow — Import & Beatport Playlist
-
-CRATEFLOW is currently a **web-based music import and playlist transfer tool**.
-
-1. Connect Spotify and Beatport.
-2. Paste a Spotify playlist URL, Spotify track URLs, or supported artist/track text.
-3. Use **IMPORT & MATCH** to import tracks and match them against the Beatport catalog via MusicAPI. Review the single highest-ranked candidate if necessary.
-4. Check the songs you want; **SELECT ALL** / **DESELECT ALL** changes the selection.
-5. Click **CREATE BEATPORT PLAYLIST** and enter a title in the popup.
-6. MusicAPI creates the playlist in the connected Beatport account and adds the selected matched tracks. CRATEFLOW only shows a successful transfer after the provider response confirms it.
-
-Up to 20 unique Beatport IDs can be transferred per playlist request.
-
-**Not part of the current product:** Direct Beatport shopping-cart transfer, browser-extension handoff or desktop app. Earlier experimental extension files remain in the repository for reference but are not loaded, linked or required by the web app. The playlist workflow does not use them.
+Beatport/MusicAPI external use and payment terms must be checked before mass-market commercialization.
