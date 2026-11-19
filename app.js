@@ -75,6 +75,7 @@ let studioResolving=false,studioLinkProgress={done:0,total:0},studioRunning=fals
 function refreshStoredMatches(){
  let changed=false;
  for(const t of state.tracks){
+  if(t.beatportExportIssue)continue;
   if(!Array.isArray(t.catalog?.candidates)||!t.catalog.candidates.length)continue;
   const before=JSON.stringify(t.catalog.candidates.map(c=>[c.externalId,c.score,c.assessment?.candidateVersion]));
   const ranked=globalThis.CrateflowMatching.rankCandidates(matchingSource(t),t.catalog.candidates,state.settings.preferExtended);
@@ -158,6 +159,7 @@ function autoSelectExact(t,candidates){
  logSync(t,'Automatic metadata match','Title, artist and version align; unique Beatport ID; not purchase verification');
 }
 function studioEligible(t){
+ if(t.beatportExportIssue)return false;
  if(t.status!=='pending'||!['exact','manual','id_ready'].includes(t.studioResult)||!t.studioCandidate?.externalId)return false;
  // Revalidate the original Spotify/import identity before sending any Beatport ID.
  const a=globalThis.CrateflowMatching.assess(matchingSource(t),t.studioCandidate,state.settings.preferExtended);
@@ -203,10 +205,21 @@ async function exportToBeatportPlaylist(){
   studioInfoOpen=true;
   if(data.verified===true){
    const confirmed=new Set(data.confirmed||[]);
+   const bad=new Set([...(data.missing||[]),...(data.mismatched||[]),...(data.unavailable||[])]);
    for(const t of unique){
-    if(!confirmed.has(String(t.studioCandidate.externalId)))continue;
-    t.beatportPlaylistId=data.playlistId;t.beatportPlaylistExported=true;t.beatportPlaylistVerified=true;
-    logSync(t,'Playlist export verified','Confirmed in Beatport playlist '+data.playlistId);
+    const id=String(t.studioCandidate.externalId);
+    if(confirmed.has(id)){
+     t.beatportPlaylistId=data.playlistId;t.beatportPlaylistExported=true;t.beatportPlaylistVerified=true;
+     delete t.beatportExportIssue;
+     logSync(t,'Playlist export verified','Confirmed in Beatport playlist '+data.playlistId);
+    }else if(bad.has(id)){
+     t.beatportExportIssue={playlistId:data.playlistId,at:Date.now(),reason:
+      (data.unavailable||[]).includes(id)?'Unavailable on Beatport':
+      (data.mismatched||[]).includes(id)?'Different track or version':'Not present in playlist'};
+     t.studioResult='review';t.studioCandidate=null;
+     if(t.match?.source==='musicapi')delete t.match;
+     logSync(t,'Playlist export requires review',t.beatportExportIssue.reason);
+    }
    }
   }
   persist();
@@ -509,6 +522,8 @@ function studioChoose(t,index){
  const c=t.catalog?.candidates?.[index];
  if(!c?.externalId)return toast('Beatport track ID missing. Cannot confirm this track.');
  t.studioCandidate={...c};
+ // The DJ explicitly reselected a catalog candidate after a failed export.
+ delete t.beatportExportIssue;
  // Explicit user selection also authorizes using Beatport's release title.
  if(!t.importTitle)t.importTitle=t.title;
  if(!t.importArtist)t.importArtist=t.artist;
