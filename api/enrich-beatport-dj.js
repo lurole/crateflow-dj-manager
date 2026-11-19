@@ -64,7 +64,7 @@ export default async function handler(req,res){
   const best=globalThis.CrateflowMatching.bestAutomatic(t,ranked,false);
   if(!best)return fail(res,422,'unverified_match','No verified title, artist and mix match for BPM/key.');
   if(beatportId&&best.externalId!==beatportId)return fail(res,422,'id_mismatch','Beatport track ID does not match.');
-  if(best.bpm===null&&!best.key)return res.status(200).json({ok:true,status:'no_metadata',bpm:null,key:null,provider:'API.SH'});
+  if(best.bpm===null&&!best.key&&!best.genre)return res.status(200).json({ok:true,status:'no_metadata',bpm:null,key:null,genre:null,provider:'API.SH'});
   return res.status(200).json({ok:true,status:'enriched',bpm:best.bpm,key:best.key,
    genre:best.genre||null,beatportId:best.externalId,matchScore:best.score,provider:'API.SH'});
  }catch{return fail(res,controller.signal.aborted?504:502,
