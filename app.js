@@ -17,17 +17,32 @@ function table(tracks){return '<div class="table">'+(tracks.length?'<table><thea
 
 const storeSearch=t=>'https://www.beatport.com/search?q='+encodeURIComponent((t.artist||'')+' '+(t.title||'')+(state.settings.preferExtended?' extended mix':''));
 function logSync(t,action,details=''){state.syncHistory.unshift({id:uid(),trackId:t.id,title:t.title,artist:t.artist,action,details,time:Date.now()});state.syncHistory=state.syncHistory.slice(0,350);persist()}
+// Keep the original import identity for matching; display/export the verified Beatport name.
+function matchingSource(t){
+ return {...t,title:t.importTitle||t.title,artist:t.importArtist||t.artist,remix:t.importRemix??t.remix};
+}
+function applyBeatportTitle(t,candidate){
+ if(!candidate?.assessment?.autoEligible||!candidate?.externalId)return false;
+ const name=String(candidate.name||'').trim();
+ if(!name||name.length>220||name===t.title)return false;
+ if(!t.importTitle)t.importTitle=t.title;
+ if(!t.importArtist)t.importArtist=t.artist;
+ if(t.importRemix===undefined)t.importRemix=t.remix||'';
+ t.title=name;
+ t.titleSource='musicapi-beatport';
+ return true;
+}
 function scoreCandidate(t,artist,title,mix){
  return globalThis.CrateflowMatching.assess(t,{artist,name:title,mixHint:mix},state.settings.preferExtended).score;
 }
 let catalogSearchBusy=false;
 async function searchCatalogTrack(t){
- const response=await fetch('/api/search-beatport',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({artist:t.artist,title:t.remix&&!String(t.title).toLowerCase().includes(String(t.remix).toLowerCase())?t.title+' ('+t.remix+')':t.title})});
+ const response=await fetch('/api/search-beatport',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({artist:t.importArtist||t.artist,title:(t.importRemix??t.remix)&&!String(t.importTitle||t.title).toLowerCase().includes(String(t.importRemix??t.remix).toLowerCase())?(t.importTitle||t.title)+' ('+(t.importRemix??t.remix)+')':(t.importTitle||t.title)})});
  const data=await response.json();
  if(!response.ok||!data.ok)throw Error((data.error||'Catalog lookup failed')+(data.providerStatus?' (MusicAPI HTTP '+data.providerStatus+(data.providerCode?', code '+data.providerCode:'')+')':'')+(data.diagnostic==='unrecognized_response'?' [response: '+(data.responseFields||[]).join(', ')+'; data: '+(data.dataFields||[]).join(', ')+'; result: '+(data.resultFields||[]).join(', ')+']':''));
- const candidates=globalThis.CrateflowMatching.rankCandidates(t,data.candidates||[],state.settings.preferExtended);
+ const candidates=globalThis.CrateflowMatching.rankCandidates(matchingSource(t),data.candidates||[],state.settings.preferExtended);
  t.catalog={status:data.status,candidates,checkedAt:Date.now()};
- const automatic=globalThis.CrateflowMatching.bestAutomatic(t,candidates,state.settings.preferExtended);
+ const automatic=globalThis.CrateflowMatching.bestAutomatic(matchingSource(t),candidates,state.settings.preferExtended);
  if(automatic)enrichTrackDjMetadata(t,automatic);
  logSync(t,'Catalog lookup',candidates.length?candidates.length+' result(s) received from MusicAPI':'No Beatport match returned');
  return candidates;
@@ -62,13 +77,13 @@ function refreshStoredMatches(){
  for(const t of state.tracks){
   if(!Array.isArray(t.catalog?.candidates)||!t.catalog.candidates.length)continue;
   const before=JSON.stringify(t.catalog.candidates.map(c=>[c.externalId,c.score,c.assessment?.candidateVersion]));
-  const ranked=globalThis.CrateflowMatching.rankCandidates(t,t.catalog.candidates,state.settings.preferExtended);
+  const ranked=globalThis.CrateflowMatching.rankCandidates(matchingSource(t),t.catalog.candidates,state.settings.preferExtended);
   const after=JSON.stringify(ranked.map(c=>[c.externalId,c.score,c.assessment?.candidateVersion]));
   if(before!==after){t.catalog.candidates=ranked;changed=true}
   else t.catalog.candidates=ranked;
   if(t.status!=='pending'||t.beatportPlaylistExported)continue;
   if(['exact','id_ready'].includes(t.studioResult)){
-   const best=globalThis.CrateflowMatching.bestAutomatic(t,ranked,state.settings.preferExtended);
+   const best=globalThis.CrateflowMatching.bestAutomatic(matchingSource(t),ranked,state.settings.preferExtended);
    if(!best||String(best.externalId)!==String(t.studioCandidate?.externalId||'')){
     // Previous 100% text matches may be different remixes or ambiguous releases.
     t.studioResult='review';t.studioCandidate=null;
@@ -76,6 +91,7 @@ function refreshStoredMatches(){
     changed=true;
    }else{
     t.studioCandidate={...best};
+    if(applyBeatportTitle(t,best))changed=true;
     if(enrichTrackDjMetadata(t,best))changed=true;
     if(t.match?.source==='musicapi')t.match.score=best.score;
    }
@@ -84,6 +100,7 @@ function refreshStoredMatches(){
    const best=globalThis.CrateflowMatching.bestAutomatic(t,ranked,state.settings.preferExtended);
    if(best){
     t.studioCandidate={...best};
+    if(applyBeatportTitle(t,best))changed=true;
     if(enrichTrackDjMetadata(t,best))changed=true;
     if(best.url){
      t.match={url:best.url,title:best.name,artist:best.artist,mix:best.mixHint,score:best.score,source:'musicapi',confirmedAt:Date.now()};
@@ -130,6 +147,7 @@ function autoSelectExact(t,candidates){
   return;
  }
  t.studioCandidate={...best};
+ applyBeatportTitle(t,best);
  enrichTrackDjMetadata(t,best);
  if(best.url){
   t.match={url:best.url,title:best.name,artist:best.artist,mix:best.mixHint,score:best.score,source:'musicapi',confirmedAt:Date.now()};
@@ -334,7 +352,7 @@ async function autoEnrichFromBeatport(t){
  const id=String(selected.beatportId||urlId);
  const response=await fetch('/api/enrich-beatport-dj',{
   method:'POST',headers:{'Content-Type':'application/json'},
-  body:JSON.stringify({title:t.title,artist:t.artist,remix:t.remix||'',isrc:t.isrc||'',
+  body:JSON.stringify({title:t.importTitle||t.title,artist:t.importArtist||t.artist,remix:t.importRemix??t.remix??'',isrc:t.isrc||'',
    ...(id?{beatportId:id}:{})})
  });
  const data=await response.json().catch(()=>({}));
@@ -457,6 +475,12 @@ function studioChoose(t,index){
  const c=t.catalog?.candidates?.[index];
  if(!c?.externalId)return toast('Beatport track ID missing. Cannot confirm this track.');
  t.studioCandidate={...c};
+ // Explicit user selection also authorizes using Beatport's release title.
+ if(!t.importTitle)t.importTitle=t.title;
+ if(!t.importArtist)t.importArtist=t.artist;
+ if(t.importRemix===undefined)t.importRemix=t.remix||'';
+ if(String(c.name||'').trim())t.title=String(c.name).trim().slice(0,220);
+ t.titleSource='musicapi-beatport';
  enrichTrackDjMetadata(t,c);
  t.match={url:c.url||null,title:c.name,artist:c.artist,mix:c.mixHint,score:c.score,source:'musicapi',confirmedAt:Date.now()};
  t.studioResult='manual';
@@ -629,7 +653,7 @@ function bind(){const on=(sel,fn,event='click')=>{let e=$(sel);if(e)e.addEventLi
     const id=String(verified.beatportId||urlId);
     const response=await fetch('/api/enrich-beatport-dj',{
      method:'POST',headers:{'Content-Type':'application/json'},
-     body:JSON.stringify({title:t.title,artist:t.artist,remix:t.remix||'',isrc:t.isrc||'',...(id?{beatportId:id}:{})})
+     body:JSON.stringify({title:t.importTitle||t.title,artist:t.importArtist||t.artist,remix:t.importRemix??t.remix??'',isrc:t.isrc||'',...(id?{beatportId:id}:{})})
     });
     const result=await response.json().catch(()=>({}));
     if(!response.ok||!result.ok){
