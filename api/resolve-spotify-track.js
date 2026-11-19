@@ -76,7 +76,7 @@ export default async function handler(req,res){
   const isrc=/^[A-Z]{2}[A-Z0-9]{3}[0-9]{7}$/.test(rawIsrc)?rawIsrc:'';
   return res.status(200).json({ok:true,status:'resolved',track:{
    title,artist,isrc,spotifyId:id,spotifyUrl:'https://open.spotify.com/track/'+id,
-   source:'musiclink',metadataVerified:true
+   source:'musiclink',spotifyIdVerified:true
   }});
  }catch(e){
   return error(res,controller.signal.aborted?504:502,
