@@ -193,15 +193,19 @@ async function exportToBeatportPlaylist(){
    const suffix=data.playlistId?' Playlist ID: '+String(data.playlistId):'';
    throw Error((data.error||'Beatport playlist transfer failed')+suffix);
   }
+  const labels=new Map(unique.map(t=>[String(t.studioCandidate.externalId),(t.importArtist||t.artist)+' – '+(t.importTitle||t.title)]));
+  const failedIds=[...(data.missing||[]),...(data.mismatched||[]),...(data.unavailable||[])];
   studioExportResult={name:data.name,added:data.added||0,requested:data.requested||unique.length,
    verified:data.verified===true,missing:data.missing||[],mismatched:data.mismatched||[],
+   unavailable:data.unavailable||[],availabilityUnknown:data.availabilityUnknown||[],
+   failedTracks:failedIds.map(id=>labels.get(String(id))||String(id)),
    playlistId:data.playlistId,warning:data.warning||'',at:Date.now()};
   studioInfoOpen=true;
   if(data.verified===true){
    const confirmed=new Set(data.confirmed||[]);
    for(const t of unique){
     if(!confirmed.has(String(t.studioCandidate.externalId)))continue;
-    t.beatportPlaylistId=data.playlistId;t.beatportPlaylistExported=true;
+    t.beatportPlaylistId=data.playlistId;t.beatportPlaylistExported=true;t.beatportPlaylistVerified=true;
     logSync(t,'Playlist export verified','Confirmed in Beatport playlist '+data.playlistId);
    }
   }
@@ -277,7 +281,10 @@ function studioView(){
  (studioRunning?'<div class="studio-progress"><div style="width:'+percent+'%"></div></div><p class="note" role="status" aria-live="polite">'+esc(studioProgress.phase||'Matching Beatport tracks')+' · '+studioProgress.done+' / '+studioProgress.total+'</p>':'')+
  (studioError?'<p class="studio-error">'+esc(studioError)+'</p>':'')+
  '<div class="compact-list"><div class="compact-col-head"><span></span><span>SONG</span><span>STATUS</span></div>'+list.map(row).join('')+(tracks.length>30&&!studioShowAll?'<button id="studioShowAll" class="btn">SHOW ALL '+tracks.length+' SONGS</button>':'')+'</div></div>'+
- (studioExportResult?'<div class="panel studio-main studio-transfer"><div class="compact-header"><div><div class="eyebrow">03 / BEATPORT PLAYLIST</div><h2>Transfer status</h2></div><button class="btn studio-info-btn" id="studioInfo">'+(studioInfoOpen?'HIDE TRANSFER INFO':'✓ PLAYLIST CREATED')+'</button></div>'+(studioInfoOpen?'<div class="studio-export-success"><strong>'+esc(studioExportResult.verified?studioExportResult.added+' / '+studioExportResult.requested+' verified tracks':'Playlist created – verification pending')+': '+esc(studioExportResult.name)+'</strong><p>'+esc(studioExportResult.warning||(studioExportResult.verified?'Verified against the contents of your Beatport playlist.':'Check the playlist on Beatport before retrying.'))+'</p>'+(studioExportResult.missing?.length?'<p>'+studioExportResult.missing.length+' missing tracks · Check the affected tracks before exporting again.</p>':'')+(studioExportResult.mismatched?.length?'<p>'+studioExportResult.mismatched.length+' inconsistent tracks · Verify versions and releases.</p>':'')+'<a href="https://www.beatport.com/" target="_blank" rel="noopener noreferrer">OPEN BEATPORT ↗</a></div>':'')+'</div>':'')+
+ (studioExportResult?'<div class="panel studio-main studio-transfer"><div class="compact-header"><div><div class="eyebrow">03 / BEATPORT PLAYLIST</div><h2>Transfer status</h2></div><button class="btn studio-info-btn" id="studioInfo">'+(studioInfoOpen?'HIDE TRANSFER INFO':'✓ PLAYLIST CREATED')+'</button></div>'+(studioInfoOpen?'<div class="studio-export-success"><strong>'+esc(studioExportResult.verified?studioExportResult.added+' / '+studioExportResult.requested+' verified tracks':'Playlist created – verification pending')+': '+esc(studioExportResult.name)+'</strong><p>'+esc(studioExportResult.warning||(studioExportResult.verified?'Verified against the contents of your Beatport playlist.':'Check the playlist on Beatport before retrying.'))+'</p>'+(studioExportResult.missing?.length?'<p>'+studioExportResult.missing.length+' missing tracks · Check the affected tracks before exporting again.</p>':'')+(studioExportResult.mismatched?.length?'<p>'+studioExportResult.mismatched.length+' tracks do not match the requested release.</p>':'')+
+ (studioExportResult.unavailable?.length?'<p>'+studioExportResult.unavailable.length+' tracks are unavailable on Beatport.</p>':'')+
+ (studioExportResult.failedTracks?.length?'<div class="studio-error"><strong>Tracks requiring attention:</strong><ul>'+studioExportResult.failedTracks.map(name=>'<li>'+esc(name)+'</li>').join('')+'</ul></div>':'')+
+ (studioExportResult.availabilityUnknown?.length?'<p>Some tracks are present in the playlist, but their purchasing availability could not be verified.</p>':'')+'<a href="https://www.beatport.com/" target="_blank" rel="noopener noreferrer">OPEN BEATPORT ↗</a></div>':'')+'</div>':'')+
  (studioModal==='playlist'?'<div class="studio-overlay"><div class="studio-dialog" role="dialog" aria-modal="true" aria-labelledby="studioDialogTitle"><button class="studio-close" id="studioClose" aria-label="Close">×</button><h2 id="studioDialogTitle">Create Beatport Playlist</h2><label class="label" for="studioPlaylistTitle">Playlist title</label><input class="field" id="studioPlaylistTitle" maxlength="75" value="'+esc(studioPlaylistName)+'"><div class="row studio-dialog-actions"><button class="btn" id="studioCancel">Cancel</button><button class="btn primary" id="studioCreatePlaylist">Create Playlist</button></div></div></div>':'');
 }
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
