@@ -40,35 +40,44 @@ export default async function handler(req,res){
  if(unique.length!==ids.length)return res.status(400).json({ok:false,error:'Duplicate tracks must be removed before export'});
  const auth='Basic '+Buffer.from(clientId+':'+secret).toString('base64');
  const base='https://api.musicapi.com/api/'+encodeURIComponent(session.uid)+'/playlists';
- const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),16000);
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),24000);
  const headers={Authorization:auth,'Content-Type':'application/json',Accept:'application/json'};
+ let createdPlaylistId=null;
  try{
   const created=await fetch(base,{method:'POST',headers,body:JSON.stringify({name:title,visibility:'private'}),signal:controller.signal});
   const playlist=await created.json().catch(()=>({}));
   if(!created.ok)return res.status(502).json({ok:false,stage:'create',error:'Beatport playlist could not be created',providerStatus:created.status});
   const playlistId=playlist?.id;
+  createdPlaylistId=playlistId;
   if(typeof playlistId!=='string'&&typeof playlistId!=='number')return res.status(502).json({ok:false,stage:'create',error:'MusicAPI returned an unexpected playlist identifier'});
   const added=await fetch(base+'/'+encodeURIComponent(String(playlistId))+'/items',{method:'POST',headers,body:JSON.stringify({itemIds:unique}),signal:controller.signal});
   if(!added.ok)return res.status(502).json({ok:false,stage:'add',error:'Playlist was created, but adding tracks failed. Check Beatport before trying again to avoid duplicate playlists.',providerStatus:added.status,playlistId:String(playlistId)});
   // MusicAPI's POST returns only "ok", not a per-track outcome.
   // Read the actual playlist and compare it to what was requested.
-  const actual=[],cursorSet=new Set();
-  let cursor=null,complete=false,verifiedRead=true;
-  for(let page=0;page<4;page++){
-   const u=new URL(base+'/'+encodeURIComponent(String(playlistId))+'/items');
-   u.searchParams.set('limitParam','100');
-   if(cursor)u.searchParams.set('nextParam',cursor);
-   const read=await fetch(u,{headers:{Authorization:auth,Accept:'application/json'},signal:controller.signal});
-   if(!read.ok){verifiedRead=false;break}
-   const data=await read.json().catch(()=>null);
-   if(!data||!Array.isArray(data.results)){verifiedRead=false;break}
-   actual.push(...data.results);
-   const next=data.nextParam;
-   if(next===null||next===undefined||next===''){complete=true;break}
-   if(typeof next!=='string'||cursorSet.has(next)){verifiedRead=false;break}
-   cursor=next;cursorSet.add(cursor);
+  let actual=[],verifiedRead=false;
+  // A newly written playlist may not be immediately consistent. Read it twice
+  // at most, without repeating the write, before reporting missing records.
+  for(let attempt=0;attempt<2;attempt++){
+   if(attempt)await new Promise(resolve=>setTimeout(resolve,1200));
+   const items=[],cursorSet=new Set();
+   let cursor=null,complete=false,valid=true;
+   for(let page=0;page<4;page++){
+    const u=new URL(base+'/'+encodeURIComponent(String(playlistId))+'/items');
+    u.searchParams.set('limitParam','100');
+    if(cursor)u.searchParams.set('nextParam',cursor);
+    const read=await fetch(u,{headers:{Authorization:auth,Accept:'application/json'},signal:controller.signal});
+    if(!read.ok){valid=false;break}
+    const data=await read.json().catch(()=>null);
+    if(!data||!Array.isArray(data.results)){valid=false;break}
+    items.push(...data.results);
+    const next=data.nextParam;
+    if(next===null||next===undefined||next===''){complete=true;break}
+    if(typeof next!=='string'||cursorSet.has(next)){valid=false;break}
+    cursor=next;cursorSet.add(cursor);
+   }
+   if(valid&&complete){actual=items;verifiedRead=true}
+   if(verifiedRead&&actual.length>=unique.length)break;
   }
-  if(!complete)verifiedRead=false;
   if(!verifiedRead){
    return res.status(200).json({ok:true,verified:false,playlistId:String(playlistId),name:title,
     requested:unique.length,added:0,unverified:unique,
@@ -123,6 +132,10 @@ export default async function handler(req,res){
    name:title,requested:unique.length,added:confirmed.length,confirmed,
    missing,mismatched,unavailable,availabilityUnknown,cartUpdated:false,
    warning:missing.length||mismatched.length||unavailable.length?'Some requested tracks were missing, unavailable or inconsistent after read-back.':availabilityUnknown.length?'Playlist membership verified, but playback/purchase availability was not explicitly confirmed for all tracks.':null});
- }catch{return res.status(502).json({ok:false,error:'MusicAPI playlist export failed or timed out. Check Beatport for a partial playlist before retrying'});}
+ }catch{
+  return res.status(502).json({ok:false,stage:createdPlaylistId?'verify':'create',
+   ...(createdPlaylistId?{playlistId:String(createdPlaylistId)}:{}),
+   error:'MusicAPI playlist export failed or timed out. Check Beatport for a partial playlist before retrying'});
+ }
  finally{clearTimeout(timer)}
 }
