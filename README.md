@@ -1,5 +1,10 @@
 # CRATEFLOW — DJ Music Workflow
 
+> **CRATEFLOW 2.0 planning & Codex handoff (2026-11-20)**
+> The current MVP is described below; the future features and database are **not yet implemented**.
+> Start with the [German project overview](PROJEKTUEBERSICHT_DE.md), [current-state inventory](CURRENT_SYSTEM.md), [product requirements](PRODUCT_REQUIREMENTS.md), [target architecture](ARCHITECTURE.md), [data model](DATA_MODEL.md), [migration plan](MIGRATION_PLAN.md), [security and operations](SECURITY_OPERATIONS.md), and [roadmap](ROADMAP.md).
+> Codex must read [AGENTS.md](AGENTS.md) and begin with the [first audit prompt](CODEX_START_PROMPT.md) before changing production functionality.
+
 A lightweight web workspace for DJs to bring their own track lists into a Beatport matching and playlist workflow.
 
 ## Spotify links without login (MusicLink adapter)
