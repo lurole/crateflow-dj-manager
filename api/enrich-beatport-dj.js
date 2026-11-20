@@ -27,7 +27,7 @@ function candidate(x){
   isrc,bpm:Number.isFinite(bpm)&&bpm>=40&&bpm<=240?bpm:null,
   key:validKey,genre:str(x?.genre?.name,90),
   url:/^https:\/\/www\.beatport\.com\/track\//.test(url)?url:null,
-  remixers:remixers.join(', ')};
+  remixerNames:remixers};
 }
 export default async function handler(req,res){
  res.setHeader('Cache-Control','no-store');

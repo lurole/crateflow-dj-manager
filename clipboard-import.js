@@ -4,8 +4,7 @@
  */
 (function(root){
  "use strict";
- const norm=s=>String(s||"").toLowerCase().normalize("NFKD")
-   .replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g," ").trim();
+ const norm=s=>s.normalize("NFC").toLowerCase().replace(/\s+/g," ").trim();
  const spotify=/(?:https?:\/\/(?:open\.)?spotify\.com\/(?:intl-[a-z]{2}\/)?(track|playlist)\/([A-Za-z0-9]{22})|spotify:(track|playlist):([A-Za-z0-9]{22}))/ig;
  const anyUrl=/\b(?:https?:\/\/|www\.|spotify:|spotify\.link\/)/i;
  function parse(input){
@@ -54,7 +53,7 @@
     continue;
    }
    if(title.length>250||artist.length>250){missingArtist.push(line.slice(0,140));continue}
-   const key="track:"+norm(artist)+"|"+norm(title);
+   const key="track:"+JSON.stringify([norm(artist),norm(title)]);
    if(seen.has(key)){duplicateCount++;continue}
    seen.add(key);tracks.push({title,artist,source:"pasted text"});
   }

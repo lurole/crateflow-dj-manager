@@ -27,31 +27,52 @@
     const equal=allIncluded&&input.length===found.length;
     return {exact:equal,allIncluded,extra:allIncluded&&!equal,input,found};
   };
-  const isVersion=s=>/\b(original|extended|radio|club|dub|instrumental|acoustic|remix|remixed|rework|bootleg|vip|live|edit|mix|remaster|remastered|version)\b/i.test(s);
-  const versionInfo=s=>{
-    const text=words(s);
-    if(!text||text==="unspecified")return {kind:"unspecified",remixer:""};
-    if(/\b(remix|rework|bootleg|vip)\b/.test(text)){
-      const remixer=text.replace(/\b(extended|radio|club|original|mix|edit|version|remix|rework|bootleg|vip|remastered|remaster)\b/g," ").replace(/\s+/g," ").trim();
-      return {kind:"remix",remixer};
-    }
-    if(/\bradio\b/.test(text))return {kind:"radio",remixer:""};
-    if(/\bextended\b/.test(text))return {kind:"extended",remixer:""};
-    if(/\binstrumental\b/.test(text))return {kind:"instrumental",remixer:""};
-    if(/\bacoustic\b/.test(text))return {kind:"acoustic",remixer:""};
-    if(/\blive\b/.test(text))return {kind:"live",remixer:""};
-    if(/\bdub\b/.test(text))return {kind:"dub",remixer:""};
-    if(/\bclub\b/.test(text))return {kind:"club",remixer:""};
-    if(/\b(remastered|remaster)\b/.test(text))return {kind:"remaster",remixer:""};
-    if(/\boriginal\b/.test(text))return {kind:"original",remixer:""};
-    if(/\bedit\b/.test(text))return {kind:"edit",remixer:""};
-    if(/\bmix\b/.test(text))return {kind:"mix",remixer:""};
-    return {kind:"unspecified",remixer:""};
+  const remixForms=["remix","rework","bootleg","vip"];
+  const editions=["radio","extended","instrumental","acoustic","live","dub","club","remaster","original","edit"];
+  const versionWords=new Set([...remixForms,...editions,"mix","version"]);
+  const versionWord=word=>word==="remixed"?"remix":word==="remastered"?"remaster":word;
+  const isVersion=s=>words(s).split(" ").some(word=>versionWords.has(versionWord(word)));
+  const version=(forms=[],qualifiers=[],detail="")=>{
+    const kind=forms.length?"remix":editions.find(marker=>qualifiers.includes(marker))||
+      qualifiers[0]||"unspecified";
+    return {kind,forms,qualifiers,detail,remixer:forms.length?detail:"",
+      key:JSON.stringify([forms,qualifiers,detail])};
   };
+  const ambiguousVersion={...version(),kind:"ambiguous"};
+  const versionInfo=(s,explicit=false)=>{
+    const text=words(s),parts=text.split(" ");
+    const flags=[...new Set(parts.map(versionWord).filter(word=>versionWords.has(word)))];
+    if(!flags.length)return explicit&&text&&text!=="unspecified"?version([],["version"],text):version();
+    const forms=remixForms.filter(word=>flags.includes(word));
+    const qualifiers=editions.filter(word=>flags.includes(word));
+    if((qualifiers.includes("radio")&&qualifiers.includes("extended"))||
+       (forms.length&&qualifiers.includes("original")))return ambiguousVersion;
+    if(qualifiers.includes("radio")||qualifiers.includes("extended")){
+      const edit=qualifiers.indexOf("edit");
+      if(edit!==-1)qualifiers.splice(edit,1);
+    }
+    if(!forms.length&&!qualifiers.length)qualifiers.push(flags.includes("mix")?"mix":"version");
+    const detail=parts.filter(word=>!versionWords.has(versionWord(word))).join(" ").trim();
+    return version(forms,qualifiers,detail);
+  };
+  const sameOrMoreSpecific=(a,b)=>b.every(word=>a.includes(word));
+  const combineVersions=(a,b)=>{
+    if(a.kind==="ambiguous"||b.kind==="ambiguous")return ambiguousVersion;
+    if(a.kind==="unspecified"||(a.kind==="mix"&&!a.detail))return b;
+    if(b.kind==="unspecified"||(b.kind==="mix"&&!b.detail))return a;
+    if(a.detail&&b.detail&&a.detail!==b.detail)return ambiguousVersion;
+    if((a.forms.length||b.forms.length)&&(a.kind==="original"||b.kind==="original"))return ambiguousVersion;
+    if(a.forms.length&&b.forms.length&&a.forms.join()!==b.forms.join())return ambiguousVersion;
+    if(!sameOrMoreSpecific(a.qualifiers,b.qualifiers)&&!sameOrMoreSpecific(b.qualifiers,a.qualifiers))
+      return ambiguousVersion;
+    return version(a.forms.length?a.forms:b.forms,
+      a.qualifiers.length>=b.qualifiers.length?a.qualifiers:b.qualifiers,a.detail||b.detail);
+  };
+  const dashSuffix=/\s[-–—]\s((?:(?!\s[-–—]\s).)+)$/;
   const descriptors=title=>{
     const text=String(title||"");
     const parenthetical=[...text.matchAll(/[\[(]([^\])]+)[\])]/g)].map(m=>m[1]).filter(isVersion);
-    const dash=text.match(/\s[-–—]\s([^–—]+)$/);
+    const dash=text.match(dashSuffix);
     if(dash&&isVersion(dash[1]))parenthetical.push(dash[1]);
     return parenthetical;
   };
@@ -59,36 +80,40 @@
     let text=String(title||"");
     text=text.replace(/[\[(]([^\])]+)[\])]/g,(whole,inner)=>
       isVersion(inner)||/^\s*(feat\.?|ft\.?|featuring)\b/i.test(inner)?" ":whole);
-    text=text.replace(/\s[-–—]\s([^–—]+)$/,(whole,inner)=>isVersion(inner)?" ":whole);
+    text=text.replace(dashSuffix,(whole,inner)=>isVersion(inner)?" ":whole);
     text=text.replace(/\s+\b(feat\.?|ft\.?|featuring)\s+.+$/i,"");
     return words(text);
   };
-  const sourceVersion=t=>{
-    const manual=String(t?.remix||"").trim();
-    if(isVersion(manual))return versionInfo(manual);
-    const extracted=descriptors(t?.title||"");
-    return extracted.length?versionInfo(extracted[extracted.length-1]):{kind:"unspecified",remixer:""};
-  };
+  const resolveVersion=(title,hint)=>
+    combineVersions(descriptors(title).map(label=>versionInfo(label)).reduce(combineVersions,version()),versionInfo(hint,true));
+  const sourceVersion=t=>resolveVersion(t?.title,t?.remix);
   const candidateVersion=c=>{
-    const extracted=descriptors(c?.name||"");
-    // A named remix in the track title takes precedence over generic API mixHint.
-    if(extracted.length)return versionInfo(extracted[extracted.length-1]);
-    const hint=String(c?.mixHint||"");
-    if(isVersion(hint))return versionInfo(hint);
-    return {kind:"unspecified",remixer:""};
+    const parsed=resolveVersion(c?.name,c?.mixHint);
+    if(parsed.kind!=="remix"||!Array.isArray(c?.remixerNames))return parsed;
+    const credits=c.remixerNames.map(words).filter(Boolean);
+    if(!credits.length)return parsed;
+    if(parsed.remixer)
+      return [credits.join(" and "),credits.join(" ")].includes(parsed.remixer)?parsed:ambiguousVersion;
+    return version(parsed.forms,parsed.qualifiers,credits.join(" and "));
   };
   const versionMatch=(requested,found)=>{
+    if(requested.kind==="ambiguous"||found.kind==="ambiguous")return false;
     if(requested.kind==="unspecified")
-      return ["unspecified","original","extended"].includes(found.kind);
-    if(requested.kind!==found.kind)return false;
-    if(requested.kind==="remix"&&requested.remixer)
-      return requested.remixer===found.remixer;
-    return true;
+      return ["unspecified","original","extended"].includes(found.kind)&&
+        found.qualifiers.length<=1&&!found.detail;
+    if(requested.kind==="remix"&&(!requested.remixer||!found.remixer))return false;
+    return requested.key===found.key;
   };
-  const versionLabel=v=>v.kind==="remix"?(v.remixer?v.remixer+" remix":"Remix"):
-    ({extended:"Extended Mix",original:"Original Mix",radio:"Radio Edit",instrumental:"Instrumental",
-      acoustic:"Acoustic",live:"Live",dub:"Dub Mix",club:"Club Mix",edit:"Edit",
-      remaster:"Remaster",mix:"Mix",unspecified:"Version unspecified"}[v.kind]||"Version unspecified");
+  const editionLabel={extended:"Extended Mix",original:"Original Mix",radio:"Radio Edit",instrumental:"Instrumental",
+    acoustic:"Acoustic",live:"Live",dub:"Dub Mix",club:"Club Mix",edit:"Edit",remaster:"Remaster",
+    mix:"Mix",version:"Version",unspecified:"Version unspecified",ambiguous:"Conflicting version information"};
+  const versionLabel=v=>v.kind==="remix"?
+    [v.remixer,...v.qualifiers,...v.forms].filter(Boolean).join(" "):
+    [v.detail,...(v.qualifiers.length?v.qualifiers:[v.kind]).map(marker=>editionLabel[marker])].filter(Boolean).join(" ");
+  const normalizeISRC=value=>{
+    const code=String(value||"").replace(/[\s-]/g,"").toUpperCase();
+    return /^[A-Z]{2}[A-Z0-9]{3}[0-9]{7}$/.test(code)?code:"";
+  };
   const assess=(track,candidate,preferExtended=true)=>{
     const title=titleCore(track?.title),otherTitle=titleCore(candidate?.name);
     const artist=artistName(track?.artist),otherArtist=artistName(candidate?.artist);
@@ -98,9 +123,8 @@
     const artistCreditsExact=artistComparison.exact;
     const req=sourceVersion(track),found=candidateVersion(candidate);
     const versionOK=versionMatch(req,found);
-    const leftISRC=String(track?.isrc||"").replace(/[^a-z0-9]/gi,"").toUpperCase();
-    const rightISRC=String(candidate?.isrc||"").replace(/[^a-z0-9]/gi,"").toUpperCase();
-    const isrcCompared=leftISRC.length===12&&rightISRC.length===12;
+    const leftISRC=normalizeISRC(track?.isrc),rightISRC=normalizeISRC(candidate?.isrc);
+    const isrcCompared=Boolean(leftISRC&&rightISRC);
     const isrcConflict=isrcCompared&&leftISRC!==rightISRC;
     const isrcMatch=isrcCompared&&leftISRC===rightISRC;
     const titleSim=titleExact?1:overlap(title,otherTitle);
@@ -153,10 +177,9 @@
     const ambiguous=ordered.some(c=>String(c.externalId)!==String(best.externalId)&&
       c.score===best.score&&
       Boolean(c.assessment.isrcMatch)===Boolean(best.assessment.isrcMatch)&&
-      preferred(c)===preferred(best)&&
-      c.assessment.versionKind===best.assessment.versionKind);
+      preferred(c)===preferred(best));
     return ambiguous?null:best;
   };
   root.CrateflowMatching=Object.freeze({assess,rankCandidates,bestAutomatic,titleCore,
-    sourceVersion,candidateVersion,versionLabel});
+    sourceVersion,candidateVersion,versionLabel,normalizeISRC});
 })(globalThis);

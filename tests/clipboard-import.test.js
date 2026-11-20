@@ -56,3 +56,8 @@ test('does not confuse radio, mix or remix titles with separate artists',()=>{
  assert.equal(x.tracks[0].artist,'Adriatique');
  assert.equal(x.tracks[0].title,'Closer (Yotto Remix)');
 });
+
+test('pasted entries with distinct Unicode titles and no IDs remain separate',()=>{
+ const result=parse('Fixture Artist – 東京\nFixture Artist – 大阪');
+ assert.deepEqual(result.tracks.map(track=>track.title),['東京','大阪']);
+});

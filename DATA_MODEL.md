@@ -31,7 +31,7 @@
 ### Playlists, folders and sets (private)
 - `playlist_folders (id UUID PK, user_id, parent_id NULL, name, position, created_at, updated_at)`. Prevent cycles via transactionally checked move or DB function, enforce same-user parent.
 - `playlists (id UUID PK, user_id, folder_id NULL, name, kind ['manual','smart'], created_at, updated_at)`.
-- `playlist_tracks (id UUID PK, user_id, playlist_id, library_track_id, position NUMERIC, added_at)`. Permit duplicate occurrences only if explicitly desired; otherwise unique `(playlist_id, library_track_id)`.
+- `playlist_tracks (id UUID PK, user_id, playlist_id, library_track_id, position NUMERIC, added_at)`. Preserve repeated occurrences from imported playlists as distinct positions that reference the same library track. Use a unique `(playlist_id, position)` constraint for ordered entries.
 - `smart_playlist_rules (playlist_id PK/FK, user_id, rules JSONB validated server-side, updated_at)`. Query private library; never execute arbitrary SQL.
 - `dj_sets (id UUID PK, user_id, source_playlist_id NULL, title, target_duration_ms NULL, created_at, updated_at)`.
 - `dj_set_tracks (id UUID PK, user_id, dj_set_id, library_track_id, position, estimated_start_ms NULL, estimated_duration_ms NULL, created_at)`. A track can appear in multiple sets; never mutate original playlist order when generating a suggestion.
@@ -70,7 +70,7 @@ erDiagram
 
 ## 4. Index and constraint recommendations
 - `library_tracks(user_id, created_at DESC, id)`, `(user_id, ownership_status)`, `(user_id, camelot_key)`, `(user_id, bpm)` and full-text/trigram if justified by query workload.
-- Partial unique `(user_id, spotify_id)` where spotify_id not null, but assess behavior for repeated versions and Spotify re-releases first.
+- Index `(user_id, spotify_id)` for lookup. A blanket unique constraint would reject imported rows that share a Spotify ID and have explicit conflicts in version or ISRC evidence.
 - No blanket unique `(user_id, normalized_artist, normalized_title)`: different mixes/releases can share this text.
 - `playlist_folders(user_id, parent_id, position)`, `playlist_tracks(playlist_id, position)`, `dj_set_tracks(dj_set_id, position)`.
 - `job_items(job_id, status)`, `import_jobs(user_id, created_at DESC)`, `export_jobs(user_id, created_at DESC)`.
