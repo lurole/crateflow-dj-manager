@@ -9,7 +9,7 @@ function mockRes(){
  return {code:0,headers:{},body:null,setHeader(k,v){this.headers[k]=v;return this},
   status(v){this.code=v;return this},json(v){this.body=v;return this}};
 }
-function request({method='POST',body={id:trackId=id},origin='https://crateflow.test',ip='unit-test-ip'}={}){
+function request({method='POST',body={id},origin='https://crateflow.test',ip='unit-test-ip'}={}){
  return {method,body,headers:{host:'crateflow.test',origin,'x-forwarded-for':ip}};
 }
 async function call(opts={}){

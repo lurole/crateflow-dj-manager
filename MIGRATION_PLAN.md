@@ -12,13 +12,18 @@
 ## 2. Observed legacy data shape
 At startup `app.js` sets `defaults = {tracks:[],playlists:[],settings:{}}`, then merges the JSON stored in `crateflow_v1`. It also maintains `syncHistory` and a local catalog cache. Fields observed in source include:
 - `tracks[]`: `id`, `title`, `artist`, `remix`, `album`, `genre`, `bpm`, `key`, `filePath`, `status`, `isrc`, `spotifyId`, `spotifyUrl`, `playlistId`, `source`, `date`, `importTitle`, `importArtist`, `importRemix`, `titleSource`, `studioResult`, `studioCandidate`, `catalog`, `djEnrichment`, `match`, `exportMapping`, `beatportPlaylistId`, `beatportPlaylistExported`, `beatportPlaylistVerified`, `beatportExportIssue`, `studioSelected`.
-- `playlists[]`: at minimum `id`, `name`; additional legacy playlist attributes must be determined by inspection/tests rather than assumed.
+- `playlists[]` has `id` and `name`. Playlists written by the updated importer also have an ordered `trackIds[]` array referencing local library tracks. Spotify imports have a separate `spotifyPlaylistId` that identifies the source playlist.
+- Playlists updated by the editor or receiving new entries during import also store `memberships[]` with one `id` UUID and `libraryTrackId` per occurrence, in `trackIds[]` order. A matching list carries stable IDs for later migration. Use the ordered source references and allocate new entry UUIDs when this metadata is absent or out of date.
 - `settings`: `preferExtended`, potential other preferences, and legacy `musicApiSlug`.
 - `syncHistory[]`: event records `id`, `trackId`, `title`, `artist`, `action`, `details`, `time`.
 - `catalogCache`: browser-local provider candidates and lookup timestamps; not automatically eligible for global reuse.
 - Separate onboarding/sessionStorage keys are not the user's library; never migrate ephemeral third-party cookies.
 
 Note: actual legacy fields may vary across versions; do not assume all records contain the listed optional fields.
+
+Local JSON restore requires track IDs, titles and one of the four workflow statuses, plus playlist IDs and names. Library and playlist IDs must be unique within their respective lists. Repeated occurrences in a playlist, provider IDs shared by different records, missing optional metadata, legacy assignments and unresolved string references are retained. Known fields used by the application are validated before confirmation. Unknown fields survive the round trip. File, validation, rendering or storage failures keep the previous active library. The restore does not alter the separate Beatport journal.
+
+The local Chromium regression in `tests/browser/backup-safety.py` can be run against the built `dist` directory on a loopback HTTP server. It covers validation before confirmation, repeat order and inert text from a backup or simulated provider response.
 
 ## 3. Suggested field mapping (validate first)
 | Legacy field | Target | Rule |
@@ -35,7 +40,8 @@ Note: actual legacy fields may vary across versions; do not assume all records c
 | `exportMapping` | private per-user verified mapping | Validate fingerprint/ID/provider scope; expire or force recheck as needed |
 | `beatportPlaylistId`, `beatportExportIssue` | export history / flags | Preserve remote ID and uncertain status; no automatic re-export |
 | `filePath` | private track file-location metadata | Preserve locally or import only with clear privacy warning; paths are sensitive and not usable across devices |
-| `playlistId` / `playlists[]` | `playlists`, `playlist_tracks` | Rebuild ownership and parent relation, preserve intended order if present |
+| `playlists[].trackIds[]` or legacy `tracks[].playlistId` | `playlists`, `playlist_tracks` | Use the explicit ordered IDs when present, including an empty list. Fall back to legacy track membership and track-array order when absent. Map each occurrence to its own position and reuse the same library track across memberships. |
+| `playlists[].spotifyPlaylistId` | Private Spotify playlist source reference | Validate and store separately from local playlist ID, Spotify track ID and Beatport export ID. |
 | `syncHistory[]` | `library_track_events` | Sanitize sensitive payload; preserve timestamps |
 | `catalogCache` | usually **do not migrate** to global cache | Re-verify licensing, provenance and freshness first |
 

@@ -48,3 +48,14 @@ test('two indistinguishable releases are not automatically selected',async()=>{
   assert.equal(res.code,200);assert.equal(res.data.status,'review');
  });
 });
+
+test('a competing release remains visible after repeated IDs fill the shortlist',async()=>{
+ const make=id=>({id,name:'Playlist Fixture',artists:[{name:'Fixture Artist'}],mix_name:'Original Mix'});
+ await withStub([...Array.from({length:8},()=>make(101)),make(102)],async()=>{
+  const res=response();
+  await handler(req('Playlist Fixture','Fixture Artist'),res);
+  assert.equal(res.code,200);
+  assert.equal(res.data.status,'review');
+  assert.ok(res.data.candidates.some(candidate=>candidate.beatportId==='102'));
+ });
+});

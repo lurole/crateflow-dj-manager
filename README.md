@@ -35,17 +35,19 @@ Unsupported URLs and missing-artist lines are not silently imported.
 
 Spotify **playlist** URLs and `spotify:playlist:ID` URIs now resolve via the independent server-side `POST /api/resolve-spotify-playlist` endpoint. The MusicAPI Core public inspection endpoint `POST https://api.musicapi.com/public/inspect/playlistItems` accepts a Spotify playlist ID and retrieves up to 50 items per page, using `nextParam` pagination. No Spotify user login is required for supported public playlists. It does not guarantee access to private, restricted, unavailable, or provider-blocked playlists.
 
-MusicAPI credentials `MUSICAPI_CLIENT_ID` and `MUSICAPI_CLIENT_SECRET` are required as Production environment variables on Vercel; the browser never receives them. The UI handles up to three playlist URLs per import and at most ten pages (500 entries) per playlist. More pages, unavailable tracks, failed pages, and provider errors are explicitly reported. Track IDs, titles, artists, albums and valid ISRCs are preserved for matching. Duplicate tracks already in the library are skipped.
+MusicAPI credentials `MUSICAPI_CLIENT_ID` and `MUSICAPI_CLIENT_SECRET` are required as Production environment variables on Vercel; the browser never receives them. The UI handles up to three playlist URLs per import and at most ten pages (500 entries) per playlist. More pages, unavailable tracks, failed pages, and provider errors are explicitly reported. Track IDs, titles, artists, albums and valid ISRCs are preserved for matching. Each accessible Spotify playlist is stored separately using its source playlist ID. A track with the same Spotify ID and compatible metadata is reused across playlists. Entries without a Spotify ID require a valid ISRC and matching title, artist, album and version for reuse with another ID-less entry. A clear version or ISRC conflict keeps the entries separate.
+
+Playlist selections use an ordered list of local track IDs and can include multiple occurrences of a track. A later import of the same Spotify playlist retains its existing order and adds newly seen occurrences. Older playlists without that list still use their original `track.playlistId` links. Imports keep existing track metadata and include the new membership data in JSON backups. The public playlist inspection route returns tracks only, so the local playlist label uses the Spotify playlist ID.
 
 Single Spotify **track** URLs continue to use MusicLink, independently of MusicAPI. The playlist endpoint uses only per-instance best-effort IP limits (12 requests/minute, 120/day); use durable authenticated quotas and a provider-usage budget before opening broad public access.
 
 ## Optimized API.SH-first catalog pipeline (2026-11-20)
 
-The import UI stays the same. For a new Spotify song the browser resolves the original title/artist via MusicLink (single link) or MusicAPI Core (playlist), then tries the **API.SH Beatport catalog** via `POST /api/search-beatport-primary`. That one response may contain title, artists, mix, ISRC, BPM, Camelot key and genre; no second API.SH call is made for a successful API.SH primary lookup. MusicAPI connected-Beatport search remains the fallback when the primary result is unavailable, non-unique, or not safely matched. Matching uses the original Spotify/import identity and refuses indistinguishable releases, other artists, mix conflicts or conflicting ISRCs.
+The import UI stays the same. For a new Spotify song the browser resolves the original title/artist via MusicLink (single link) or MusicAPI Core (playlist), then tries the **API.SH Beatport catalog** via `POST /api/search-beatport-primary`. That one response may contain title, artists, mix, ISRC, BPM, Camelot key and genre; no second API.SH call is made for a successful API.SH primary lookup. MusicAPI connected-Beatport search is the fallback when the primary search fails or returns no version-eligible candidate. Competing primary candidates that cannot be distinguished require manual review. Matching uses the original Spotify/import identity and refuses indistinguishable releases, other artists, mix conflicts or conflicting ISRCs.
 
 Successful catalog results are cached locally per original song identity for up to 30 days, capped at 250 entries. This browser-local cache is a pragmatic MVP measure, not a central or cross-device cache. API.SH search currently has a best-effort quota of 10 calls/minute and 40/day per IP/server instance; paid lookups are throttled. The old MusicAPI matching and API.SH enrichment routes remain as fallbacks. Existing MusicAPI-matched library entries need not be re-imported.
 
-**Critical ID boundary:** API.SH returns numeric Beatport public catalog IDs but MusicAPI playlist calls require connected-service item IDs, which must not be presumed identical. The API.SH result is marked `exportIdVerified:false`. Only when the user clicks Create Beatport Playlist does CRATEFLOW retrieve MusicAPI candidates, compare original title/artist/version/ISRC to both providers, and cache a verified mapping against the original source fingerprint. If any selected song cannot be mapped uniquely, playlist creation stops **before** any write. The export then retains its server-side playlist read-back verification. This is the basis for reducing duplicate search/API credits without risking a provider-ID mix-up.
+**Critical ID boundary.** API.SH catalog IDs and MusicAPI connected-track IDs have separate meanings. Before an export, a fresh connected Beatport search checks the original track and selected release against MusicAPI. Each unambiguous result yields a short-lived server proof. The export route requires one proof per track before it can create a playlist. Old cached mappings do not authorize a write.
 
 This client-driven optimization is not a persistent background queue; keep the browser tab open for large jobs. Catalog/playlist accuracy and provider mapping still require live validation on representative real tracks.
 
@@ -61,7 +63,7 @@ Connect a Beatport account via MusicAPI when ready to match songs. `MUSICAPI_ENA
 
 The local `matching.js` engine ranks candidates by track title, artist, mix/version and optional ISRC. Remixes and versions are not interchangeable. Ambiguous or incomplete matches require explicit review. Metadata percentages are heuristic, not guarantees of the exact recording or purchase availability.
 
-Creating a Beatport playlist is an explicit user action that submits selected MusicAPI track identifiers. It does **not** buy music, add to a cart or automatically download audio files.
+Creating a Beatport playlist requires explicit user action. The browser journals the job before each write, keeps the known playlist ID and verifies contents in a separate read. Use **Check transfer** to read again after an interruption. An unidentified playlist requires manual review in Beatport. See the [export flow, recovery rules and guarantees](docs/BEATPORT_EXPORT.md).
 
 ## Storage and data protection
 
@@ -69,9 +71,13 @@ Tracks, playlists, status, matching history and file paths are currently saved i
 
 Before public launch: provision dedicated user authentication, cloud database with row-level access control, durable quotas/rate limiting, secure per-user account binding, terms/privacy disclosures, and commercial integration rights.
 
+## Cloud foundation
+
+Phase 1 adds an isolated Supabase Auth route plus versioned PostgreSQL schema and owner policies. See the [Supabase setup and verification guide](docs/SUPABASE_SETUP.md) and the [Phase 0 integration plan](docs/PHASE_0_INTEGRATION.md).
+
 ## Local development
 
-Requires Node 18+:
+Requires Node.js 22 or newer. Install dependencies with `npm ci`.
 
 ```bash
 npm start

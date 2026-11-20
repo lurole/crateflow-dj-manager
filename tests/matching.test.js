@@ -141,3 +141,73 @@ test('matching an extra-credits release still refuses an explicitly wrong remix'
  const result=matches(source,[candidate('Doa (Radio Edit)','Traumer, Anton, antraum','123')])[0];
  assert.equal(result.assessment.autoEligible,false);
 });
+
+test('a named Radio Remix does not auto-match the same remixer’s Extended Remix', () => {
+ const source=track('Closer (Alex Radio Remix)');
+ const ranked=matches(source,[candidate('Closer (Alex Extended Remix)','Adriatique','121')]);
+ assert.equal(matching.bestAutomatic(source,ranked),null);
+});
+
+test('equal ISRC does not override a conflicting named remix edition',()=>{
+ const isrc='USABC1234567';
+ const source=track('Closer (Alex Radio Remix)','Adriatique',{isrc});
+ const [result]=matches(source,[candidate('Closer (Alex Extended Remix)','Adriatique','1',{isrc})]);
+ assert.equal(result.assessment.isrcMatch,true);
+ assert.equal(result.assessment.versionOK,false);
+ assert.equal(result.assessment.autoEligible,false);
+});
+
+test('a correct remix remains eligible when the title and mix hint supply different details',()=>{
+ const source=track('Closer (Alex Extended Remix)');
+ const options=[
+  candidate('Closer (Alex Remix)','Adriatique','1',{mixHint:'Radio Edit'}),
+  candidate('Closer (Alex Remix)','Adriatique','2',{mixHint:'Extended Mix'}),
+ ];
+ assert.equal(matching.bestAutomatic(source,matches(source,options)).externalId,'2');
+});
+
+test('conflicting title and provider mix hint require manual review',()=>{
+ const source=track('Closer (Alex Radio Remix)');
+ const candidates=matches(source,[
+  candidate('Closer (Alex Radio Remix)','Adriatique','1',{mixHint:'Alex Extended Remix'}),
+ ]);
+ assert.equal(candidates[0].assessment.autoEligible,false);
+ assert.equal(matching.bestAutomatic(source,candidates),null);
+});
+
+test('matching does not assume a remixer when a generic Remix title gives none',()=>{
+ const source=track('Closer (Remix)');
+ assert.equal(matching.bestAutomatic(source,matches(source,[candidate('Closer (Alex Remix)')])),null);
+});
+
+test('structured remixer credits distinguish a correct generic mix label from contradictory credits',()=>{
+ const source=track('Closer (Alex Extended Remix)');
+ const correct=candidate('Closer','Adriatique','1',{mixHint:'Extended Remix',remixerNames:['Alex']});
+ const conflict=candidate('Closer (Alex Extended Remix)','Adriatique','2',{remixerNames:['Sam']});
+ const ranked=matches(source,[conflict,correct]);
+ assert.equal(matching.bestAutomatic(source,ranked).externalId,'1');
+ assert.equal(ranked.find(item=>item.externalId==='2').assessment.autoEligible,false);
+});
+
+test('distinct named edits, remaster years and remix forms do not collapse',()=>{
+ for(const [first,second] of [
+  ['Alex Edit','Sam Edit'],['2024 Remaster','2025 Remaster'],['Alex Rework','Alex Remix'],
+  ['Original Mix','Alex Remix'],['Instrumental Mix','Acoustic Mix'],
+ ]){
+  const source=track('Closer ('+first+')');
+  const [result]=matches(source,[candidate('Closer ('+second+')')]);
+  assert.equal(result.assessment.versionOK,false,first+' / '+second);
+ }
+});
+
+test('different version classes with equal evidence and no preferred candidate require review',()=>{
+ const source=track('Closer');
+ const options=[candidate('Closer','Adriatique','1'),candidate('Closer (Original Mix)','Adriatique','2')];
+ assert.equal(matching.bestAutomatic(source,matches(source,options),true),null);
+});
+
+test('unrecognized explicit mix labels are compared instead of treated as absent',()=>{
+ const source=track('Closer','Adriatique',{remix:'Festival Exclusive'});
+ const [result]=matches(source,[candidate('Closer','Adriatique','1',{mixHint:'Afterhours Exclusive'})]);
+ assert.equal(result.assessment.autoEligible,false);
+});

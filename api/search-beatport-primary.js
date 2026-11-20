@@ -18,6 +18,7 @@ function allow(ip){
 function normalize(x){
  if(!x||typeof x!=='object')return null;
  const artists=Array.isArray(x.artists)?x.artists.map(a=>clean(typeof a==='string'?a:a?.name,120)).filter(Boolean):[];
+ const remixers=Array.isArray(x.remixers)?x.remixers.map(a=>clean(typeof a==='string'?a:a?.name,120)).filter(Boolean):[];
  const id=String(x.id??'');
  const name=clean(x.name,220);
  if(!/^[0-9]{1,12}$/.test(id)||!name||!artists.length)return null;
@@ -26,7 +27,7 @@ function normalize(x){
  const key=clean(x.camelot,4).toUpperCase();
  const url=clean(x.url,300);
  return {externalId:id,beatportId:id,name,artistNames:artists,artist:artists.join(', ').slice(0,250),
-   mixHint:clean(x.mix_name,100),isrc:/^[A-Z]{2}[A-Z0-9]{3}[0-9]{7}$/.test(rawISRC)?rawISRC:'',
+   mixHint:clean(x.mix_name,100),...(remixers.length?{remixerNames:remixers}:{}),isrc:/^[A-Z]{2}[A-Z0-9]{3}[0-9]{7}$/.test(rawISRC)?rawISRC:'',
    bpm:Number.isFinite(bpm)&&bpm>=40&&bpm<=240?bpm:null,
    key:/^(?:[1-9]|1[0-2])[AB]$/.test(key)?key:'',
    genre:clean(x.genre?.name,90),
@@ -57,8 +58,9 @@ export default async function handler(req,res){
   const data=await response.json().catch(()=>null);
   if(!data||!Array.isArray(data.results))return deny(res,502,'schema','Unexpected Beatport search response');
   const source={title,artist,remix,isrc};
-  const candidates=globalThis.CrateflowMatching.rankCandidates(source,data.results.map(normalize).filter(Boolean),true)
-   .slice(0,8);
+  const ranked=globalThis.CrateflowMatching.rankCandidates(source,data.results.slice(0,25).map(normalize).filter(Boolean),true);
+  // Keep eligible alternatives even when duplicate records fill the display shortlist.
+  const candidates=ranked.filter((candidate,index)=>index<8||candidate.assessment.autoEligible);
   const best=globalThis.CrateflowMatching.bestAutomatic(source,candidates,true);
   return res.status(200).json({ok:true,provider:'API.SH',status:best?'matched':candidates.length?'review':'not_found',
    candidates,creditsUsed:Number.isFinite(Number(data.credits_used))?Number(data.credits_used):null});
