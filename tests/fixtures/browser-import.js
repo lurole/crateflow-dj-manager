@@ -2,7 +2,7 @@ import { webcrypto } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
 
-const scripts = ['clipboard-import.js', 'matching.js', 'mix-compatibility.js', 'app.js']
+const scripts = ['clipboard-import.js', 'matching.js', 'mix-compatibility.js', 'beatport-export.js', 'app.js']
   .map(name => [name, readFileSync(new URL('../../' + name, import.meta.url), 'utf8')]);
 
 export function createImportBrowser(fetch, savedState) {

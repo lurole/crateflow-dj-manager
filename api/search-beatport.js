@@ -1,4 +1,5 @@
-import crypto from 'node:crypto';
+import { beatportSession, connectionKey, beatportCatalogReference, exportSource, itemIdPattern,
+  signTrackProof, trackProofLimit, uuidPattern, verifiedExportTrack } from '../lib/beatport-export.js';
 // MusicAPI Beatport catalog lookup. No cart or user account mutations.
 // Beta: only perform a lookup when explicitly requested by the browser.
 // This public beta route has basic per-instance throttling, not durable user authentication.
@@ -7,20 +8,13 @@ export default async function handler(req,res){
   res.setHeader('Cache-Control','no-store');
   res.setHeader('X-Content-Type-Options','nosniff');
   if(req.method!=='POST'){res.setHeader('Allow','POST');return res.status(405).json({ok:false,error:'Method not allowed'});}
-  const host=String(req.headers['x-forwarded-host']||req.headers.host||'').split(',')[0];
+  const host=String(req.headers['x-forwarded-host']||req.headers.host||'').split(',')[0].trim();
   const origin=String(req.headers.origin||'');
   if(!host||origin!=='https://'+host)return res.status(403).json({ok:false,error:'Invalid origin'});
   if(process.env.MUSICAPI_ENABLE_VERIFICATION!=='true')return res.status(503).json({ok:false,error:'MusicAPI evaluation is not enabled'});
-  const rawCookie=String(req.headers.cookie||'').split(';').map(v=>v.trim()).find(v=>v.startsWith('cf_bp='))?.slice(6);
   const secret=process.env.MUSICAPI_CLIENT_SECRET;
-  if(!rawCookie||!secret)return res.status(401).json({ok:false,error:'Reconnect Beatport to enable account search'});
-  const parts=rawCookie.split('.');
-  if(parts.length!==2)return res.status(401).json({ok:false,error:'Invalid Beatport session'});
-  const expected=crypto.createHmac('sha256',secret).update('crateflow-beatport-v1.'+parts[0]).digest('base64url');
-  if(parts[1].length!==expected.length||!crypto.timingSafeEqual(Buffer.from(parts[1]),Buffer.from(expected)))return res.status(401).json({ok:false,error:'Invalid Beatport session'});
-  let session;
-  try{session=JSON.parse(Buffer.from(parts[0],'base64url').toString('utf8'))}catch{return res.status(401).json({ok:false,error:'Invalid Beatport session'})}
-  if(!/^[0-9a-f-]{36}$/i.test(session?.uid||'')||!Number.isInteger(session?.exp)||session.exp<Math.floor(Date.now()/1000))return res.status(401).json({ok:false,error:'Beatport session expired. Reconnect Beatport'});
+  const session=secret&&beatportSession(req.headers,secret);
+  if(!session)return res.status(401).json({ok:false,error:'Reconnect Beatport to enable account search'});
   const clientId=process.env.MUSICAPI_CLIENT_ID;
   if(!clientId)return res.status(503).json({ok:false,error:'MusicAPI client ID missing on server'});
   const ip=String(req.headers['x-forwarded-for']||'unknown').split(',')[0].trim().slice(0,80);
@@ -31,9 +25,14 @@ export default async function handler(req,res){
   if(value.count>12)return res.status(429).json({ok:false,error:'Search limit reached; try again later'});
   let body=req.body;
   if(typeof body==='string'){try{body=JSON.parse(body)}catch{return res.status(400).json({ok:false,error:'Invalid JSON'})}}
-  const artist=typeof body?.artist==='string'?body.artist.trim():'';
-  const title=typeof body?.title==='string'?body.title.trim():'';
-  if(!artist||!title||artist.length>160||title.length>200)return res.status(400).json({ok:false,error:'Artist and track title required'});
+  const check=body?.exportCheck;
+  const source=check&&exportSource(check.source);
+  if(check&&(!source||typeof check.exportId!=='string'||!uuidPattern.test(check.exportId)))
+    return res.status(400).json({ok:false,error:'Invalid export source identity'});
+  const artist=source?.artist||(typeof body?.artist==='string'?body.artist.trim():'');
+  const title=source?.title||(typeof body?.title==='string'?body.title.trim():'');
+  if(!artist||!title||(!source&&(artist.length>160||title.length>200)))
+    return res.status(400).json({ok:false,error:'Artist and track title required'});
   const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),9500);
   try{
     const response=await fetch('https://api.musicapi.com/api/'+encodeURIComponent(session.uid)+'/search',{
@@ -85,17 +84,16 @@ export default async function handler(req,res){
       });
     }
     const raw=envelope||[];
-    const candidates=raw.slice(0,8).map(item=>{
+    if(check&&(raw.length>25||data?.nextParam||data?.data?.nextParam||data?.result?.nextParam))
+      return res.status(409).json({ok:false,error:'MusicAPI results were too broad to verify one recording'});
+    const candidates=raw.slice(0,check?25:8).map(item=>{
       const d=item?.data||item?.track||item;
       const artists=Array.isArray(d?.artistNames)?d.artistNames:
         Array.isArray(d?.artists)?d.artists.map(a=>typeof a==='string'?a:a?.name):
         typeof d?.artist==='string'?[d.artist]:[];
       const name=String(d?.name||d?.title||d?.trackName||'').slice(0,220);
       const url=String(d?.url||d?.externalUrl||d?.shareUrl||d?.links?.beatport||d?.external_urls?.beatport||'');
-      // MusicAPI playlist item IDs and Beatport store track IDs may differ.
-      // Preserve externalId for playlists; expose only a numeric store ID for cart automation.
-      const idOptions=[d?.beatportId,d?.beatportTrackId,d?.beatport_id,d?.trackId,d?.externalId,d?.id];
-      const beatportId=idOptions.map(x=>String(x??'')).find(x=>/^\d{1,12}$/.test(x))||null;
+      const catalogReference=beatportCatalogReference(d,url);
       // DJ fields are optional: only accept explicit, plausible values from a matched catalog record.
       const bpmRaw=[d?.bpm,d?.tempo,d?.beatsPerMinute,d?.beats_per_minute,d?.attributes?.bpm].find(v=>v!==undefined&&v!==null&&v!=='');
       const bpmNumber=Number(bpmRaw);
@@ -103,10 +101,31 @@ export default async function handler(req,res){
       const keyRaw=[d?.camelotKey,d?.camelot,d?.musicalKey,d?.musical_key,d?.keyName,d?.key?.name,d?.key?.camelot,d?.key,d?.attributes?.key]
        .find(v=>typeof v==='string'&&v.trim().length>0);
       const key=typeof keyRaw==='string'?keyRaw.trim().slice(0,50):null;
-      return {bpm,key,name,artistNames:artists.filter(v=>typeof v==='string'&&v.trim()).slice(0,15).map(v=>v.slice(0,120)),artist:artists.filter(Boolean).join(', ').slice(0,250),url:/^https:\/\/(www\.)?beatport\.com\/track\//.test(url)?url:null,externalId:String(d?.externalId||d?.id||'').slice(0,80),beatportId,isrc:String(d?.isrc||'').slice(0,40),mixHint:([d?.mixName,d?.mixType,d?.versionName,d?.version,d?.mix].find(v=>typeof v==='string'&&v.trim())||(/extended mix/i.test(name)?'Extended Mix':/radio edit/i.test(name)?'Radio Edit':/original mix/i.test(name)?'Original Mix':'Unspecified')).slice(0,100)};
-    }).filter(c=>c.name);
+      const externalId=String(d?.externalId||d?.id||'');
+      const mixHint=[d?.mixName,d?.mixType,d?.versionName,d?.version,d?.mix].find(v=>typeof v==='string'&&v.trim())
+       ||(/extended mix/i.test(name)?'Extended Mix':/radio edit/i.test(name)?'Radio Edit':/original mix/i.test(name)?'Original Mix':'Unspecified');
+      const artistNames=artists.filter(v=>typeof v==='string'&&v.trim());
+      const providerName=String(d?.name||d?.title||d?.trackName||'');
+      const isrc=String(d?.isrc||'');
+      if(check&&(!itemIdPattern.test(externalId)||providerName.length>230||mixHint.length>100||isrc.length>40||
+         !artistNames.length||artistNames.length>15||artistNames.some(value=>value.length>120)))return null;
+      return {bpm,key,name:check?providerName:name,artistNames:artistNames.slice(0,15).map(v=>v.slice(0,120)),
+       artist:artistNames.join(', ').slice(0,250),url:/^https:\/\/(www\.)?beatport\.com\/track\//.test(url)?url:null,
+       externalId:externalId.slice(0,80),...catalogReference,isrc:isrc.slice(0,40),mixHint:mixHint.slice(0,100),
+       ...(typeof d?.isAvailable==='boolean'?{isAvailable:d.isAvailable}:{})};
+    }).filter(c=>c?.name?.trim());
     if(raw.length>0&&!candidates.length){
       return res.status(502).json({ok:false,error:'MusicAPI returned records, but CRATEFLOW could not read their track fields.',diagnostic:'unrecognized_tracks',recordCount:raw.length});
+    }
+    if(check){
+      if(candidates.length!==raw.length)
+        return res.status(409).json({ok:false,error:'Connected results contained tracks without a verifiable identity'});
+      const track=verifiedExportTrack(source,check.selection,candidates);
+      if(!track)return res.status(409).json({ok:false,error:'The connected Beatport search did not uniquely confirm the selected recording'});
+      const proof=signTrackProof({secret,connection:connectionKey(session,secret,host)},check.exportId,track);
+      if(proof.length>trackProofLimit)
+        return res.status(409).json({ok:false,error:'The verified track metadata is too large to export safely'});
+      return res.status(200).json({ok:true,id:track.id,proof});
     }
     return res.status(200).json({ok:true,status:candidates.length?'success':declaredEmpty?'not_found':raw.length===0?'not_found':'unreadable_tracks',candidates});
 

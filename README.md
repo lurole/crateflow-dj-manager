@@ -47,7 +47,7 @@ The import UI stays the same. For a new Spotify song the browser resolves the or
 
 Successful catalog results are cached locally per original song identity for up to 30 days, capped at 250 entries. This browser-local cache is a pragmatic MVP measure, not a central or cross-device cache. API.SH search currently has a best-effort quota of 10 calls/minute and 40/day per IP/server instance; paid lookups are throttled. The old MusicAPI matching and API.SH enrichment routes remain as fallbacks. Existing MusicAPI-matched library entries need not be re-imported.
 
-**Critical ID boundary:** API.SH returns numeric Beatport public catalog IDs but MusicAPI playlist calls require connected-service item IDs, which must not be presumed identical. The API.SH result is marked `exportIdVerified:false`. Only when the user clicks Create Beatport Playlist does CRATEFLOW retrieve MusicAPI candidates, compare original title/artist/version/ISRC to both providers, and cache a verified mapping against the original source fingerprint. If any selected song cannot be mapped uniquely, playlist creation stops **before** any write. The export then retains its server-side playlist read-back verification. This is the basis for reducing duplicate search/API credits without risking a provider-ID mix-up.
+**Critical ID boundary.** API.SH catalog IDs and MusicAPI connected-track IDs have separate meanings. Before an export, a fresh connected Beatport search checks the original track and selected release against MusicAPI. Each unambiguous result yields a short-lived server proof. The export route requires one proof per track before it can create a playlist. Old cached mappings do not authorize a write.
 
 This client-driven optimization is not a persistent background queue; keep the browser tab open for large jobs. Catalog/playlist accuracy and provider mapping still require live validation on representative real tracks.
 
@@ -63,7 +63,7 @@ Connect a Beatport account via MusicAPI when ready to match songs. `MUSICAPI_ENA
 
 The local `matching.js` engine ranks candidates by track title, artist, mix/version and optional ISRC. Remixes and versions are not interchangeable. Ambiguous or incomplete matches require explicit review. Metadata percentages are heuristic, not guarantees of the exact recording or purchase availability.
 
-Creating a Beatport playlist is an explicit user action that submits selected MusicAPI track identifiers. It does **not** buy music, add to a cart or automatically download audio files.
+Creating a Beatport playlist requires explicit user action. The browser journals the job before each write, keeps the known playlist ID and verifies contents in a separate read. Use **Check transfer** to read again after an interruption. An unidentified playlist requires manual review in Beatport. See the [export flow, recovery rules and guarantees](docs/BEATPORT_EXPORT.md).
 
 ## Storage and data protection
 

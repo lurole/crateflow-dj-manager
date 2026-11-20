@@ -2,7 +2,7 @@ name: Offline CI
 
 on:
   pull_request:
-    branches: [main, test/crateflow-phase-0-1]
+    branches: [main, test/crateflow-phase-0-1, fix/crateflow-phase-0-2]
   push:
     branches: [main]
 
