@@ -23,12 +23,19 @@ Die App speichert weiterhin unter `crateflow_v1`. Laden und Filtern schreiben ke
 | --- | --- |
 | `playlist.id`, `name`, `folderId`, `spotifyPlaylistId` | `playlists.id`, `name`, `folder_id`, `spotify_playlist_id`. Alte IDs bei Bedarf über eine stabile ID-Zuordnung übernehmen. Browser-Playlists liegen derzeit auf der obersten Ebene. |
 | `membership.playlistId`, `libraryTrackId`, `position` | `playlist_tracks.playlist_id`, `library_track_id`, `position`. Die Position ist eine Ganzzahl ab null und pro Playlist eindeutig. |
-| `membership.key` | Reproduzierbarer Leseschlüssel aus Playlist, Track und Vorkommen. Beim späteren Speichern einmal eine dauerhafte `playlist_tracks.id` als UUID pro Eintrag vergeben. Danach über diese UUID umsortieren, auch bei wiederholten Tracks. |
+| `membership.id` | Dauerhafte UUID pro Vorkommen. Für Altbestände gibt es bis zur ersten Änderung temporäre IDs aus Playlist und Position. Bei einer späteren Übernahme kommen ausschliesslich dauerhafte UUIDs als `playlist_tracks.id` infrage. |
 | Kontozuordnung | `user_id` aus der authentifizierten Sitzung ableiten. PR #4 erzwingt dieselbe Benutzer-ID bei Playlist-, Track- und Ordnerreferenzen. |
+
+## Playlist-Editor in Phase 2.2
+
+In der Music Library eine Playlist auswählen und **Edit playlist** öffnen. Der Editor zeigt die vollständige Reihenfolge. Tracks lassen sich per Drag & Drop oder über die Pfeiltasten-Schaltflächen verschieben. **Remove** betrifft ein Vorkommen der angezeigten Playlist. **Add track** hängt den gewählten Library-Track als neues Vorkommen an. Die Schaltflächen sind auch per Tastatur und auf Touchgeräten bedienbar.
+
+Ein erfolgreicher Schreibvorgang speichert UUID und Track-Referenz pro Eintrag in `playlists[].memberships` sowie die gleich geordnete `trackIds`-Liste für frühere App-Versionen. Einträge behalten ihre UUID bei Verschieben, weiteren Importen und Neuladen. Wenn ein vorheriger App-Stand `trackIds` verändert hat, verwendet der Editor diese Liste und vergibt beim nächsten Bearbeiten neue UUIDs für die betreffende Playlist. Das Öffnen und Wiederherstellen eines alten Backups benötigt keine automatische Umschreibung.
+
+Der Editor prüft vor dem Schreiben, ob sich der gespeicherte Bestand seit dem Laden oder letzten eigenen Speichern geändert hat. Bereits sichtbare Fremdänderungen führen zu einer Aufforderung zum Neuladen. `localStorage` bietet für nahezu gleichzeitige Schreibvorgänge aus mehreren Tabs keine gemeinsame Transaktion. Beim späteren Cloud-Speichern sollen Änderungen der Positionen in einer Transaktion erfolgen und gegen die gelesene Playlist-Revision geprüft werden.
 
 ## Nächste Entwicklungsschritte
 
-1. Playlist-Operationen für Erstellen, Umbenennen, Hinzufügen und Entfernen ergänzen. Das Entfernen eines einzelnen Vorkommens lässt den Library-Track und andere Playlists bestehen. Die bestehende Löschfunktion der Library entfernt weiterhin den Track und seine Mitgliedschaften nach Bestätigung.
-2. Drag & Drop auf dauerhafte Eintrags-IDs stützen. Bei späterer Cloud-Speicherung die Positionsänderungen gemeinsam und mit Prüfung auf zwischenzeitliche Änderungen übernehmen. Für Ordner und Unterordner `playlist_folders.parent_id` nutzen und Zyklen beim Verschieben transaktional verhindern.
-3. Smart Playlists über validierte Regeln auf der privaten Library berechnen. Automatische Set-Reihenfolgen als getrennte, editierbare Vorschläge speichern und die Playlist-Reihenfolge erhalten.
-4. Die geordnete Playlist an die bestehenden Exportpfade anbinden. Beim Beatport-Export die Identitätsprüfung, Auftragsverwaltung und Verifikation aus PR #3 beibehalten. Beim Rekordbox-Export die Track-Sammlung und die Reihenfolge der Playlist-Einträge getrennt aufbauen. Lokale Dateipfade und Importkompatibilität im Zielprogramm separat prüfen.
+1. Erstellen und Umbenennen von Playlists ergänzen. Für Ordner und Unterordner `playlist_folders.parent_id` nutzen und Zyklen beim Verschieben transaktional verhindern.
+2. Smart Playlists über validierte Regeln auf der privaten Library berechnen. Automatische Set-Reihenfolgen als getrennte, editierbare Vorschläge speichern und die Playlist-Reihenfolge erhalten.
+3. Die geordnete Playlist an die bestehenden Exportpfade anbinden. Beim Beatport-Export die Identitätsprüfung, Auftragsverwaltung und Verifikation aus PR #3 beibehalten. Beim Rekordbox-Export die Track-Sammlung und die Reihenfolge der Playlist-Einträge getrennt aufbauen. Lokale Dateipfade und Importkompatibilität im Zielprogramm separat prüfen.

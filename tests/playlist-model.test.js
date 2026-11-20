@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import test from 'node:test';
 import '../lib/playlist-model.js';
 import { createImportBrowser } from './fixtures/browser-import.js';
 
-const { readLocalPlaylistModel } = globalThis.CrateflowPlaylistModel;
+const { readLocalPlaylistModel, editorPlaylist, editPlaylist } = globalThis.CrateflowPlaylistModel;
 
 test('membership rows reference the library and preserve order, repeated entries and shared tracks', () => {
   const snapshot = {
@@ -20,21 +21,17 @@ test('membership rows reference the library and preserve order, repeated entries
     { id: 'first', name: 'Same name', folderId: null, spotifyPlaylistId: 'S'.repeat(22) },
     { id: 'second', name: 'Same name', folderId: null, spotifyPlaylistId: null },
   ]);
-  assert.deepEqual(model.memberships.map(({ key, ...row }) => row), [
+  assert.deepEqual(model.memberships.map(({ id, ...row }) => row), [
     { playlistId: 'first', libraryTrackId: 'b', position: 0 },
     { playlistId: 'first', libraryTrackId: 'a', position: 1 },
     { playlistId: 'first', libraryTrackId: 'b', position: 2 },
     { playlistId: 'second', libraryTrackId: 'b', position: 0 },
   ]);
-  assert.equal(new Set(model.memberships.map(row => row.key)).size, 4);
+  assert.equal(new Set(model.memberships.map(row => row.id)).size, 4);
   assert.deepEqual(readLocalPlaylistModel(snapshot), model);
   assert.deepEqual(model.issues, []);
   assert.deepEqual(snapshot, original);
 
-  const reordered = structuredClone(snapshot);
-  reordered.playlists[0].trackIds = ['b', 'b', 'a'];
-  assert.deepEqual(readLocalPlaylistModel(reordered).memberships.map(row => row.key),
-    [0, 2, 1, 3].map(index => model.memberships[index].key));
 });
 
 test('the model reads old backups with the same membership and order as the running app', () => {
@@ -80,7 +77,7 @@ test('orphaned references and ambiguous IDs are reported without guessing or ren
   });
 
   assert.deepEqual(model.playlists.map(row => row.id), ['good']);
-  assert.deepEqual(model.memberships.map(({ key, ...row }) => row), [
+  assert.deepEqual(model.memberships.map(({ id, ...row }) => row), [
     { playlistId: 'good', libraryTrackId: 'valid', position: 2 },
   ]);
   assert.deepEqual(model.issues, [
@@ -91,4 +88,65 @@ test('orphaned references and ambiguous IDs are reported without guessing or ren
     { type: 'ambiguous-playlist', playlistId: 'duplicate', index: 2 },
     { type: 'invalid-playlist-id', playlistId: '', index: 3 },
   ]);
+});
+
+function editorSnapshot() {
+  return {
+    tracks: [{ id: 'same', title: 'Same' }, { id: 'other', title: 'Other' }],
+    playlists: [
+      { id: 'first', trackIds: ['same', 'other', 'same'] },
+      { id: 'second', trackIds: ['same'] },
+    ],
+  };
+}
+
+test('editing assigns durable UUIDs, moves a specific repeated entry and keeps another playlist intact', () => {
+  const original = editorSnapshot();
+  const legacy = editorPlaylist(original, 'first').entries;
+  const added = editPlaylist(original, 'first', { type: 'add', trackId: 'same' }, randomUUID);
+  const saved = { ...original, playlists: added.playlists };
+  const initial = editorPlaylist(saved, 'first').entries;
+  const ids = initial.map(row => row.id);
+  assert.equal(new Set(ids).size, 4);
+  assert.ok(ids.every(id => /^[0-9a-f-]{36}$/.test(id)));
+  assert.equal(added.entryId, ids[3]);
+
+  const moved = editPlaylist(saved, 'first', { type: 'move', entryId: ids[2], targetId: ids[0], side: 'before' }, randomUUID);
+  const reloaded = JSON.parse(JSON.stringify({ ...saved, playlists: moved.playlists }));
+  assert.deepEqual(editorPlaylist(reloaded, 'first').entries.map(row => row.id), [ids[2], ids[0], ids[1], ids[3]]);
+  assert.deepEqual(reloaded.playlists[0].trackIds, ['same', 'same', 'other', 'same']);
+  assert.deepEqual(reloaded.playlists[1], original.playlists[1]);
+  assert.deepEqual(editorPlaylist(original, 'first').entries, legacy);
+  assert.deepEqual(original, editorSnapshot());
+});
+
+test('removing one legacy occurrence leaves the other occurrence and both library records', () => {
+  const original = editorSnapshot();
+  const { entries } = editorPlaylist(original, 'first');
+  const result = editPlaylist(original, 'first', { type: 'remove', entryId: entries[2].id }, randomUUID);
+  assert.deepEqual(result.playlists[0].trackIds, ['same', 'other']);
+  assert.strictEqual(result.playlists[1], original.playlists[1]);
+  assert.equal(original.tracks.length, 2);
+  assert.deepEqual(original.playlists[0].trackIds, ['same', 'other', 'same']);
+});
+
+test('the editor rejects cross-playlist targets, foreign entry IDs, and absent library tracks', () => {
+  const snapshot = editorSnapshot();
+  const first = editorPlaylist(snapshot, 'first').entries[0].id;
+  const second = editorPlaylist(snapshot, 'second').entries[0].id;
+  assert.equal(editPlaylist(snapshot, 'first', { type: 'move', entryId: first, targetId: second, side: 'after' }, randomUUID), null);
+  assert.equal(editPlaylist(snapshot, 'first', { type: 'remove', entryId: second }, randomUUID), null);
+  assert.equal(editPlaylist(snapshot, 'first', { type: 'add', trackId: 'unknown' }, randomUUID), null);
+  assert.equal(editPlaylist(snapshot, 'first', { type: 'move', entryId: first, targetId: first, side: 'after' }, randomUUID), null);
+});
+
+test('an older app’s trackIds edit takes priority over mismatched UUID metadata', () => {
+  const original = editorSnapshot();
+  const added = editPlaylist(original, 'first', { type: 'add', trackId: 'same' }, randomUUID);
+  const playlist = { ...added.playlists[0], trackIds: ['other', 'same', 'same', 'same'] };
+  const snapshot = { ...original, playlists: [playlist] };
+  const { entries } = editorPlaylist(snapshot, 'first');
+  assert.deepEqual(entries.map(entry => entry.libraryTrackId), playlist.trackIds);
+  assert.ok(entries.every(entry => entry.id.startsWith('legacy:')));
+  assert.equal(playlist.memberships[0].libraryTrackId, 'same');
 });

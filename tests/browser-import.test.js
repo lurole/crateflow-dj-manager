@@ -214,11 +214,14 @@ test('confirmed library deletion cleans all of a track’s playlist occurrences 
 
   const snapshot = browser.snapshot();
   assert.deepEqual(snapshot.tracks, [retained, other]);
-  assert.deepEqual(snapshot.playlists, [
+  assert.deepEqual(snapshot.playlists.map(({ memberships, ...playlist }) => playlist), [
     playlists[0],
     { ...playlists[1], trackIds: ['retained', 'other'] },
     { ...playlists[2], trackIds: ['other', 'retained'] },
   ]);
+  for (const playlist of snapshot.playlists.slice(1)) {
+    assert.deepEqual(playlist.memberships.map(entry => entry.libraryTrackId), playlist.trackIds);
+  }
   assert.deepEqual(Array.from(browser.visiblePlaylist('legacy'), track => track.id), ['retained']);
 });
 

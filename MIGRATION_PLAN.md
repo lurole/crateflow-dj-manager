@@ -13,6 +13,7 @@
 At startup `app.js` sets `defaults = {tracks:[],playlists:[],settings:{}}`, then merges the JSON stored in `crateflow_v1`. It also maintains `syncHistory` and a local catalog cache. Fields observed in source include:
 - `tracks[]`: `id`, `title`, `artist`, `remix`, `album`, `genre`, `bpm`, `key`, `filePath`, `status`, `isrc`, `spotifyId`, `spotifyUrl`, `playlistId`, `source`, `date`, `importTitle`, `importArtist`, `importRemix`, `titleSource`, `studioResult`, `studioCandidate`, `catalog`, `djEnrichment`, `match`, `exportMapping`, `beatportPlaylistId`, `beatportPlaylistExported`, `beatportPlaylistVerified`, `beatportExportIssue`, `studioSelected`.
 - `playlists[]` has `id` and `name`. Playlists written by the updated importer also have an ordered `trackIds[]` array referencing local library tracks. Spotify imports have a separate `spotifyPlaylistId` that identifies the source playlist.
+- Playlists updated by the editor or receiving new entries during import also store `memberships[]` with one `id` UUID and `libraryTrackId` per occurrence, in `trackIds[]` order. A matching list carries stable IDs for later migration. Use the ordered source references and allocate new entry UUIDs when this metadata is absent or out of date.
 - `settings`: `preferExtended`, potential other preferences, and legacy `musicApiSlug`.
 - `syncHistory[]`: event records `id`, `trackId`, `title`, `artist`, `action`, `details`, `time`.
 - `catalogCache`: browser-local provider candidates and lookup timestamps; not automatically eligible for global reuse.
