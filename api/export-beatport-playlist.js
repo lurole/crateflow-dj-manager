@@ -1,141 +1,257 @@
-import crypto from 'node:crypto';
-import '../matching.js';
-export const maxDuration=30;
-// Explicit user action only. Creates a Beatport playlist; DOES NOT change the shopping cart.
-const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-export default async function handler(req,res){
- res.setHeader('Cache-Control','no-store');
- if(req.method!=='POST'){res.setHeader('Allow','POST');return res.status(405).json({ok:false,error:'Method not allowed'});}
- const host=String(req.headers['x-forwarded-host']||req.headers.host||'').split(',')[0];
- if(!host||req.headers.origin!=='https://'+host)return res.status(403).json({ok:false,error:'Invalid origin'});
- if(process.env.MUSICAPI_ENABLE_VERIFICATION!=='true')return res.status(503).json({ok:false,error:'MusicAPI integration disabled'});
- const clientId=process.env.MUSICAPI_CLIENT_ID,secret=process.env.MUSICAPI_CLIENT_SECRET;
- if(!clientId||!secret)return res.status(503).json({ok:false,error:'MusicAPI credentials missing'});
- const rawCookie=String(req.headers.cookie||'').split(';').map(x=>x.trim()).find(x=>x.startsWith('cf_bp='))?.slice(6);
- if(!rawCookie)return res.status(401).json({ok:false,error:'Connect Beatport first'});
- const parts=rawCookie.split('.');
- if(parts.length!==2)return res.status(401).json({ok:false,error:'Invalid Beatport session'});
- const signature=crypto.createHmac('sha256',secret).update('crateflow-beatport-v1.'+parts[0]).digest('base64url');
- if(parts[1].length!==signature.length||!crypto.timingSafeEqual(Buffer.from(parts[1]),Buffer.from(signature)))return res.status(401).json({ok:false,error:'Invalid Beatport session'});
- let session;try{session=JSON.parse(Buffer.from(parts[0],'base64url').toString('utf8'))}catch{return res.status(401).json({ok:false,error:'Invalid Beatport session'})}
- if(!UUID.test(session?.uid||'')||!Number.isInteger(session?.exp)||session.exp<Math.floor(Date.now()/1000))return res.status(401).json({ok:false,error:'Beatport connection expired; reconnect'});
- let payload;try{payload=typeof req.body==='string'?JSON.parse(req.body||'{}'):req.body}catch{return res.status(400).json({ok:false,error:'Invalid JSON request'})}
- const ids=payload?.trackIds, title=String(payload?.name||'CRATEFLOW Selection').trim().slice(0,75);
- // Optional catalog identity for read-back verification. Never trust acceptance alone.
- const submitted=Array.isArray(payload?.tracks)?payload.tracks:null;
- const safeStr=(v,max)=>typeof v==='string'?v.trim().slice(0,max):'';
- const normalized=s=>String(s||'').normalize('NFKD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
- const validateISRC=s=>/^[A-Z]{2}[A-Z0-9]{3}[0-9]{7}$/.test(s);
- if(submitted&&(
-    submitted.length!==ids?.length||
-    !submitted.every((t,i)=>t&&typeof t==='object'&&String(t.id||'')===ids[i]&&
-       typeof t.title==='string'&&t.title.trim().length>0&&t.title.length<=220&&
-       typeof t.artist==='string'&&t.artist.trim().length>0&&t.artist.length<=250&&
-       (t.remix===undefined||(typeof t.remix==='string'&&t.remix.length<=100))&&
-       (!t.isrc||validateISRC(String(t.isrc).toUpperCase()))
-    )))return res.status(400).json({ok:false,error:'Invalid track verification metadata'});
- if(!Array.isArray(ids)||ids.length<1||ids.length>20||!title)return res.status(400).json({ok:false,error:'Choose 1 to 20 confirmed tracks'});
- if(!ids.every(x=>typeof x==='string'&&/^[A-Za-z0-9_-]{1,80}$/.test(x)))return res.status(400).json({ok:false,error:'Invalid Beatport track identifiers'});
- const unique=[...new Set(ids)];
- if(unique.length!==ids.length)return res.status(400).json({ok:false,error:'Duplicate tracks must be removed before export'});
- const auth='Basic '+Buffer.from(clientId+':'+secret).toString('base64');
- const base='https://api.musicapi.com/api/'+encodeURIComponent(session.uid)+'/playlists';
- const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),24000);
- const headers={Authorization:auth,'Content-Type':'application/json',Accept:'application/json'};
- let createdPlaylistId=null;
- try{
-  const created=await fetch(base,{method:'POST',headers,body:JSON.stringify({name:title,visibility:'private'}),signal:controller.signal});
-  const playlist=await created.json().catch(()=>({}));
-  if(!created.ok)return res.status(502).json({ok:false,stage:'create',error:'Beatport playlist could not be created',providerStatus:created.status});
-  const playlistId=playlist?.id;
-  createdPlaylistId=playlistId;
-  if(typeof playlistId!=='string'&&typeof playlistId!=='number')return res.status(502).json({ok:false,stage:'create',error:'MusicAPI returned an unexpected playlist identifier'});
-  const added=await fetch(base+'/'+encodeURIComponent(String(playlistId))+'/items',{method:'POST',headers,body:JSON.stringify({itemIds:unique}),signal:controller.signal});
-  if(!added.ok)return res.status(502).json({ok:false,stage:'add',error:'Playlist was created, but adding tracks failed. Check Beatport before trying again to avoid duplicate playlists.',providerStatus:added.status,playlistId:String(playlistId)});
-  // MusicAPI's POST returns only "ok", not a per-track outcome.
-  // Read the actual playlist and compare it to what was requested.
-  let actual=[],verifiedRead=false;
-  // A newly written playlist may not be immediately consistent. Read it twice
-  // at most, without repeating the write, before reporting missing records.
-  for(let attempt=0;attempt<2;attempt++){
-   if(attempt)await new Promise(resolve=>setTimeout(resolve,1200));
-   const items=[],cursorSet=new Set();
-   let cursor=null,complete=false,valid=true;
-   for(let page=0;page<4;page++){
-    const u=new URL(base+'/'+encodeURIComponent(String(playlistId))+'/items');
-    u.searchParams.set('limitParam','100');
-    if(cursor)u.searchParams.set('nextParam',cursor);
-    const read=await fetch(u,{headers:{Authorization:auth,Accept:'application/json'},signal:controller.signal});
-    if(!read.ok){valid=false;break}
-    const data=await read.json().catch(()=>null);
-    if(!data||!Array.isArray(data.results)){valid=false;break}
-    items.push(...data.results);
-    const next=data.nextParam;
-    if(next===null||next===undefined||next===''){complete=true;break}
-    if(typeof next!=='string'||cursorSet.has(next)){valid=false;break}
-    cursor=next;cursorSet.add(cursor);
-   }
-   if(valid&&complete){actual=items;verifiedRead=true}
-   if(verifiedRead&&actual.length>=unique.length)break;
+import { createHash } from 'node:crypto';
+import {
+  appendLifetime, beatportSession, connectionKey, itemIdPattern, proofLifetime,
+  readbackOutcomes, readReceipt, readTrackProof, signReceipt, trackProofLimit, uuidPattern,
+} from '../lib/beatport-export.js';
+
+export const maxDuration = 30;
+const recent = new Map();
+const retention = 2 * proofLifetime;
+
+const reply = (code, data) => ({ code, data });
+const failed = (code, error, reason = 'rejected') =>
+  reply(code, { ok: false, status: 'failed', stage: 'preflight', reason, error });
+const outcome = (job, fields, code = 200) => reply(code, {
+  ok: code < 400,
+  exportId: job.exportId,
+  name: job.name,
+  requested: job.tracks.length,
+  ...(job.playlistId ? { playlistId: job.playlistId, receipt: job.receipt } : {}),
+  ...fields,
+});
+
+function pending(job, stage) {
+  return outcome(job, { status: 'pending', stage, warning: 'The write is still in progress. Check the export again.' }, 202);
+}
+
+function uncertain(job, stage, context, error, reason, providerStatus) {
+  const timedOut = context.signal.aborted;
+  return outcome(job, {
+    status: 'unverified',
+    stage,
+    reason: timedOut ? 'timeout' : reason,
+    error: timedOut ? 'Beatport did not respond before the deadline. The outcome is unknown.' : error,
+    ...(providerStatus ? { providerStatus } : {}),
+    verified: false,
+    unverified: job.tracks.map(track => track.id),
+  }, 502);
+}
+
+function remember(key, job) {
+  const now = Date.now();
+  for (const [id, entry] of recent) {
+    if (!entry.busy && now - entry.recordedAt >= retention) recent.delete(id);
   }
-  if(!verifiedRead){
-   return res.status(200).json({ok:true,verified:false,playlistId:String(playlistId),name:title,
-    requested:unique.length,added:0,unverified:unique,
-    warning:'Beatport accepted the playlist request, but its contents could not be verified. Check the playlist before retrying.',cartUpdated:false});
+  if (recent.size >= 512) return false;
+  recent.set(key, job);
+  return true;
+}
+
+function activeJob(key) {
+  const job = recent.get(key);
+  if (job && !job.busy && Date.now() - job.recordedAt >= retention) {
+    recent.delete(key);
+    return null;
   }
-  const notUsed=new Set(actual.map((_,i)=>i)),confirmed=[],missing=[],mismatched=[],unavailable=[],availabilityUnknown=[];
-  for(let i=0;i<unique.length;i++){
-   const id=unique[i],request=submitted?.[i];
-   // Prefer the exact Beatport catalog ID. Fall back only to a matching ISRC,
-   // or the same complete title plus at least one exact artist credit.
-   let found=-1,identityOK=false;
-   for(const index of notUsed){
-    const item=actual[index];
-    if(String(item?.id||'')!==id)continue;
-    found=index;break;
-   }
-   if(found<0&&request){
-    const srcISRC=String(request.isrc||'').toUpperCase();
-    const srcName=normalized(request.title);
-    const srcArtists=String(request.artist||'').split(/[,;]+/).map(normalized).filter(Boolean);
-    for(const index of notUsed){
-     const item=actual[index],returnedISRC=String(item?.isrc||'').toUpperCase();
-     const sameISRC=validateISRC(srcISRC)&&srcISRC===returnedISRC;
-     const nameOK=srcName&&normalized(item?.name)===srcName;
-     const names=Array.isArray(item?.artists)?item.artists.map(a=>normalized(a?.name||a)).filter(Boolean):[];
-     const artistOK=srcArtists.length&&srcArtists.every(a=>names.includes(a));
-     if(sameISRC||(nameOK&&artistOK)){found=index;break}
+  return job;
+}
+
+async function createPlaylist(context, payload, exportId, key, previous) {
+  const name = typeof payload.name === 'string' && payload.name.length <= 75 ? payload.name.trim() : '';
+  if (!name || !Array.isArray(payload.proofs) || payload.proofs.length < 1 || payload.proofs.length > 20)
+    return failed(400, 'Provide a playlist name and proofs for 1 to 20 tracks.');
+  if (!payload.proofs.every(proof => typeof proof === 'string' && proof.length <= trackProofLimit))
+    return failed(400, 'Invalid track verification proof.');
+  const fingerprint = createHash('sha256').update(JSON.stringify([name, payload.proofs])).digest('hex');
+  if (previous) {
+    if (previous.fingerprint !== fingerprint) return failed(409, 'This export ID belongs to a different selection.');
+    return previous.createResult || pending(previous, 'create');
+  }
+  const tracks = payload.proofs.map(proof => readTrackProof(context, exportId, proof));
+  if (tracks.some(track => !track) || new Set(tracks.map(track => track.id)).size !== tracks.length)
+    return failed(400, 'The track verification expired, is invalid, or identifies the same Beatport track more than once.');
+
+  const job = { exportId, name, tracks, fingerprint, recordedAt: Date.now(), busy: 'create' };
+  if (!remember(key, job)) return failed(503, 'The export service is busy. No playlist was created.');
+
+  try {
+    const created = await fetch(context.base, {
+      method: 'POST', headers: context.headers, signal: context.signal, redirect: 'error',
+      body: JSON.stringify({ name, visibility: 'private' }),
+    });
+    if (!created.ok) {
+      job.createResult = uncertain(job, 'create', context,
+        'Beatport returned an error while creating the playlist. Check Beatport before creating another.', 'provider_error', created.status);
+      return job.createResult;
     }
-   }
-   if(found>=0){
-    notUsed.delete(found);
-    const item=actual[found];
-    if(request){
-     const artists=Array.isArray(item?.artists)?item.artists.map(a=>typeof a==='string'?a:a?.name).filter(Boolean):[];
-     const assessment=globalThis.CrateflowMatching.assess(
-      {title:request.title,artist:request.artist,remix:request.remix||'',isrc:request.isrc||''},
-      {name:item?.name||'',artist:artists.join(', '),artistNames:artists,
-       externalId:item?.id||id,isrc:item?.isrc||''}
-     );
-     // Neither a matching ID nor a successful playlist write can disguise a wrong version,
-     // an artist mismatch or a conflicting recording identifier.
-     identityOK=assessment.autoEligible;
-    }else identityOK=false;
-    if(item?.isAvailable===false)unavailable.push(id);
-    else if(identityOK){
-     confirmed.push(id);
-     if(item?.isAvailable!==true)availabilityUnknown.push(id);
-    }else mismatched.push(id);
-   }else missing.push(id);
+    const value = await created.json().catch(() => null);
+    const playlistId = typeof value?.id === 'string' || typeof value?.id === 'number' ? String(value.id) : '';
+    if (!itemIdPattern.test(playlistId)) {
+      job.createResult = uncertain(job, 'create', context,
+        'Beatport did not return a usable playlist ID. Check Beatport before creating another.', 'invalid_response');
+      return job.createResult;
+    }
+    job.playlistId = playlistId;
+    job.createdAt = Date.now();
+    job.receipt = signReceipt(context, { exportId, name, tracks, playlistId, createdAt: job.createdAt });
+    job.createResult = outcome(job, { status: 'created', stage: 'create', verified: false });
+    return job.createResult;
+  } catch {
+    job.createResult = uncertain(job, 'create', context,
+      'The connection was lost while creating the playlist. Check Beatport before creating another.', 'network_error');
+    return job.createResult;
+  } finally {
+    job.busy = null;
   }
-  return res.status(200).json({ok:true,verified:true,playlistId:String(playlistId),
-   name:title,requested:unique.length,added:confirmed.length,confirmed,
-   missing,mismatched,unavailable,availabilityUnknown,cartUpdated:false,
-   warning:missing.length||mismatched.length||unavailable.length?'Some requested tracks were missing, unavailable or inconsistent after read-back.':availabilityUnknown.length?'Playlist membership verified, but playback/purchase availability was not explicitly confirmed for all tracks.':null});
- }catch{
-  return res.status(502).json({ok:false,stage:createdPlaylistId?'verify':'create',
-   ...(createdPlaylistId?{playlistId:String(createdPlaylistId)}:{}),
-   error:'MusicAPI playlist export failed or timed out. Check Beatport for a partial playlist before retrying'});
- }
- finally{clearTimeout(timer)}
+}
+
+async function readPlaylist(context, job) {
+  const items = [], cursors = new Set();
+  let cursor = null;
+  for (let page = 0; page < 4; page++) {
+    const url = new URL(context.base + '/' + encodeURIComponent(job.playlistId) + '/items');
+    url.searchParams.set('limitParam', '100');
+    if (cursor) url.searchParams.set('nextParam', cursor);
+    const read = await fetch(url, {
+      headers: { Authorization: context.headers.Authorization, Accept: 'application/json' },
+      signal: context.signal, redirect: 'error',
+    });
+    if (!read.ok) throw Error('provider_error');
+    const data = await read.json();
+    if (!Array.isArray(data?.results) || data.results.length > 100) throw Error('invalid_response');
+    items.push(...data.results);
+    cursor = data.nextParam;
+    if (cursor === null || cursor === undefined || cursor === '') return items;
+    if (typeof cursor !== 'string' || cursor.length > 2048 || cursors.has(cursor)) throw Error('invalid_response');
+    cursors.add(cursor);
+  }
+  throw Error('incomplete_read');
+}
+
+function verificationResult(job, items) {
+  const outcomes = readbackOutcomes(job.tracks, items);
+  const added = outcomes.confirmed.length;
+  const verified = added === job.tracks.length && !outcomes.unexpected && !outcomes.unknownCount;
+  return outcome(job, {
+    status: verified ? 'verified' : added ? 'partial' : 'unverified',
+    stage: 'verify', verified, added, ...outcomes,
+  });
+}
+
+async function appendTracks(context, job) {
+  if (job.appendResult) return job.appendResult;
+  if (job.busy) return pending(job, job.busy);
+  if (Date.now() - job.createdAt >= appendLifetime)
+    return outcome(job, { status: 'unverified', stage: 'add', reason: 'append_expired',
+      error: 'The append window expired. Read the playlist or review it in Beatport.', verified: false }, 409);
+  job.busy = 'add';
+  try {
+    // A previous attempt may have run in a different Vercel instance. A
+    // nonempty or unreadable playlist can never authorize another append.
+    let current;
+    try {
+      current = await readPlaylist(context, job);
+    } catch {
+      job.appendResult = uncertain(job, 'add', context,
+        'Beatport could not confirm an empty playlist. No tracks were sent in this attempt.', 'precheck_failed');
+      return job.appendResult;
+    }
+    if (current.length) {
+      job.appendResult = verificationResult(job, current);
+      return job.appendResult;
+    }
+    const added = await fetch(context.base + '/' + encodeURIComponent(job.playlistId) + '/items', {
+      method: 'POST', headers: context.headers, signal: context.signal, redirect: 'error',
+      body: JSON.stringify({ itemIds: job.tracks.map(track => track.id) }),
+    });
+    job.appendResult = added.ok
+      ? outcome(job, { status: 'appended', stage: 'add', verified: false })
+      : uncertain(job, 'add', context,
+        'The playlist was created, but Beatport returned an error while adding tracks. Check the playlist contents.', 'provider_error', added.status);
+    return job.appendResult;
+  } catch {
+    job.appendResult = uncertain(job, 'add', context,
+      'The playlist was created, but the connection was lost while adding tracks. Check the playlist contents.', 'network_error');
+    return job.appendResult;
+  } finally {
+    job.busy = null;
+  }
+}
+
+async function verifyPlaylist(context, job) {
+  if (job.busy) return pending(job, job.busy);
+  let latest = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt) await new Promise(resolve => setTimeout(resolve, 1200));
+    try {
+      const result = verificationResult(job, await readPlaylist(context, job));
+      if (result.data.verified) return result;
+      latest = result;
+    } catch {
+      if (context.signal.aborted) break;
+    }
+  }
+  if (latest) return latest;
+  return uncertain(job, 'verify', context,
+    'The playlist exists, but Beatport did not return verifiable contents. Try checking the contents again.', 'read_failed');
+}
+
+export default async function handler(req, res) {
+  res.setHeader('Cache-Control', 'no-store');
+  const send = result => res.status(result.code).json(result.data);
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST');
+    return send(failed(405, 'Method not allowed'));
+  }
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
+  if (!host || req.headers.origin !== 'https://' + host) return send(failed(403, 'Invalid origin'));
+  const clientId = process.env.MUSICAPI_CLIENT_ID, secret = process.env.MUSICAPI_CLIENT_SECRET;
+  if (process.env.MUSICAPI_ENABLE_VERIFICATION !== 'true' || !clientId || !secret)
+    return send(failed(503, 'MusicAPI integration unavailable'));
+  const session = beatportSession(req.headers, secret);
+  if (!session) return send(failed(401, 'Connect Beatport first'));
+
+  let payload;
+  try { payload = typeof req.body === 'string' ? JSON.parse(req.body) : req.body; }
+  catch { return send(failed(400, 'Invalid JSON request')); }
+  const { exportId, operation, receipt } = payload || {};
+  if (typeof exportId !== 'string' || !uuidPattern.test(exportId) || !['create', 'append', 'verify'].includes(operation))
+    return send(failed(400, 'A valid export ID and operation are required.'));
+
+  const connection = connectionKey(session, secret, host);
+  const key = connection + ':' + exportId;
+  const previous = activeJob(key);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 24_000);
+  const context = {
+    connection, secret, signal: controller.signal,
+    base: 'https://api.musicapi.com/api/' + encodeURIComponent(session.uid) + '/playlists',
+    headers: {
+      Authorization: 'Basic ' + Buffer.from(clientId + ':' + secret).toString('base64'),
+      'Content-Type': 'application/json', Accept: 'application/json',
+    },
+  };
+  try {
+    if (operation === 'create') return send(await createPlaylist(context, payload, exportId, key, previous));
+    const signed = receipt && readReceipt(context, exportId, receipt);
+    if ((receipt && !signed) || (operation === 'append' && !signed))
+      return send(failed(403, 'This playlist receipt is invalid for the current Beatport connection.'));
+    if (signed && previous && signed.playlistId !== previous.playlistId)
+      return send(failed(409, 'The export ID is associated with a different playlist.'));
+    const job = previous || (signed && { ...signed, receipt, recordedAt: Date.now() });
+    if (operation === 'append') {
+      if (!previous && !remember(key, job)) return send(failed(503, 'The export service is busy.'));
+      return send(await appendTracks(context, job));
+    }
+    if (!job?.playlistId) {
+      if (job?.busy) return send(pending(job, job.busy));
+      return send(job?.createResult || reply(409, {
+        ok: false, exportId, status: 'unverified', stage: 'create', reason: 'unknown_playlist',
+        error: 'No confirmed playlist ID is available. Open Beatport and reconcile the export manually.',
+      }));
+    }
+    return send(await verifyPlaylist(context, job));
+  } finally {
+    clearTimeout(timer);
+  }
 }
