@@ -34,8 +34,24 @@ Ein erfolgreicher Schreibvorgang speichert UUID und Track-Referenz pro Eintrag i
 
 Der Editor prüft vor dem Schreiben, ob sich der gespeicherte Bestand seit dem Laden oder letzten eigenen Speichern geändert hat. Bereits sichtbare Fremdänderungen führen zu einer Aufforderung zum Neuladen. `localStorage` bietet für nahezu gleichzeitige Schreibvorgänge aus mehreren Tabs keine gemeinsame Transaktion. Beim späteren Cloud-Speichern sollen Änderungen der Positionen in einer Transaktion erfolgen und gegen die gelesene Playlist-Revision geprüft werden.
 
+## Lokale Playlist-Verwaltung in Phase 2.2.1
+
+**New playlist** erstellt eine leere Liste. **Rename** ändert den Namen der gewählten Liste und behält deren ID, Spotify-Quellreferenz und Reihenfolge. **Delete playlist** braucht eine Bestätigung. Dabei entfallen die gewählte Liste und ihre alten `playlistId`-Zuordnungen. Tracks und Mitgliedschaften in anderen Playlists bleiben erhalten.
+
+Neue und geänderte Namen werden getrimmt und Unicode-normalisiert. Leere Namen, mehr als 250 Zeichen, Steuerzeichen und doppelte Namen unabhängig von Gross- und Kleinschreibung werden abgelehnt. Vorhandene Namen aus importierten Listen und Backups bleiben lesbar. Nach einem bestätigten und erfolgreich gespeicherten Backup-Import startet die Library-Ansicht mit allen Tracks und zurückgesetzten Filtern.
+
+Für den lokalen Browser-Regressionslauf `npm run build` ausführen und `dist` auf einem Loopback-Port bereitstellen. Beispiel mit Python Playwright und lokalem Chromium:
+
+```sh
+python3 -m http.server 5192 --bind 127.0.0.1 --directory dist
+# In a second terminal
+python3 tests/browser/playlist-ux.py http://127.0.0.1:5192
+```
+
+Der Browsertest blockiert externe Requests und prüft alte Backups, Namensvalidierung, Playlist-Aktionen, Gerätebreiten und den Beatport-Dialog mit simulierten API-Antworten.
+
 ## Nächste Entwicklungsschritte
 
-1. Erstellen und Umbenennen von Playlists ergänzen. Für Ordner und Unterordner `playlist_folders.parent_id` nutzen und Zyklen beim Verschieben transaktional verhindern.
+1. Für Ordner und Unterordner `playlist_folders.parent_id` nutzen und Zyklen beim Verschieben transaktional verhindern.
 2. Smart Playlists über validierte Regeln auf der privaten Library berechnen. Automatische Set-Reihenfolgen als getrennte, editierbare Vorschläge speichern und die Playlist-Reihenfolge erhalten.
 3. Die geordnete Playlist an die bestehenden Exportpfade anbinden. Beim Beatport-Export die Identitätsprüfung, Auftragsverwaltung und Verifikation aus PR #3 beibehalten. Beim Rekordbox-Export die Track-Sammlung und die Reihenfolge der Playlist-Einträge getrennt aufbauen. Lokale Dateipfade und Importkompatibilität im Zielprogramm separat prüfen.
