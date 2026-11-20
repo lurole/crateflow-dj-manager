@@ -95,9 +95,9 @@ function importTracks(rows,name){
  toast(importSummary(result));
  return result.added;
 }
-const head=(eyebrow,title,desc)=>'<div class="eyebrow">'+eyebrow+'</div><h1>'+title+'</h1><p>'+desc+'</p>';
-const card=(label,num,extra)=>'<div class="card"><label>'+label+'</label><strong>'+num+'</strong><small>'+extra+'</small></div>';
-const action=(label,act,id)=>'<button class="btn" data-act="'+act+'" data-id="'+id+'">'+label+'</button>';
+const head=(eyebrow,title,desc)=>'<div class="eyebrow">'+esc(eyebrow)+'</div><h1>'+esc(title)+'</h1><p>'+esc(desc)+'</p>';
+const card=(label,num,extra)=>'<div class="card"><label>'+esc(label)+'</label><strong>'+esc(num)+'</strong><small>'+esc(extra)+'</small></div>';
+const action=(label,act,id)=>'<button class="btn" data-act="'+esc(act)+'" data-id="'+esc(id)+'">'+esc(label)+'</button>';
 const beatport=t=>'https://www.beatport.com/search?q='+encodeURIComponent(t.artist+' '+t.title+(t.remix?' '+t.remix:''));
 function visible(){
  const tracks=playlistFilter==='all'?state.tracks:playlistModel.tracksInPlaylist(state,playlistFilter);
@@ -110,7 +110,18 @@ function deleteTrack(track){
  state=next;
  render();
 }
-function table(tracks){return '<div class="table">'+(tracks.length?'<table><thead><tr><th>TRACK</th><th>BPM / KEY</th><th>GENRE</th><th>STATUS</th><th>ACTIONS</th></tr></thead><tbody>'+tracks.map(t=>'<tr><td><strong>'+esc(t.title)+'</strong><small>'+esc(t.artist)+' '+esc(t.remix)+'</small></td><td>'+esc(t.bpm||'—')+' / '+esc(t.key||'—')+'</td><td>'+esc(t.genre||'—')+'</td><td><span class="pill '+esc(t.status)+'">'+esc(t.status.toUpperCase())+'</span></td><td><div class="row">'+action('⌕','beatport',t.id)+action('✎','edit',t.id)+action('×','delete',t.id)+'</div></td></tr>').join('')+'</tbody></table>':'<div class="empty">Noch keine passenden Tracks vorhanden.</div>')+'</div>'}
+function table(tracks){
+ if(!tracks.length)return '<div class="table"><div class="empty">Noch keine passenden Tracks vorhanden.</div></div>';
+ const rows=tracks.map(t=>{
+  const status=typeof t.status==='string'?t.status:'unknown';
+  return '<tr><td><strong>'+esc(t.title)+'</strong><small>'+esc(t.artist)+' '+esc(t.remix)+'</small></td><td>'+
+   esc(t.bpm||'—')+' / '+esc(t.key||'—')+'</td><td>'+esc(t.genre||'—')+'</td><td><span class="pill '+esc(status)+'">'+
+   esc(status.toUpperCase())+'</span></td><td><div class="row">'+action('⌕','beatport',t.id)+action('✎','edit',t.id)+
+   action('×','delete',t.id)+'</div></td></tr>';
+ });
+ return '<div class="table"><table><thead><tr><th>TRACK</th><th>BPM / KEY</th><th>GENRE</th><th>STATUS</th><th>ACTIONS</th></tr></thead><tbody>'+
+  rows.join('')+'</tbody></table></div>';
+}
 
 function libraryView(){
  const editor=playlistEditorOpen?playlistModel.editorPlaylist(state,playlistFilter):null;
@@ -505,7 +516,7 @@ function beatportExportPanel(job){
   ['confirmed','Confirmed'],['missing','Missing'],['mismatched','Different track or version'],
   ['unavailable','Unavailable'],['unverified','Could not verify'],
  ];
- const outcomes=counts.map(([key,label])=>(job[key]?.length?
+ const outcomes=counts.map(([key,label])=>(Array.isArray(job[key])&&job[key].length?
   '<li><strong>'+esc(label)+' ('+job[key].length+')</strong>'+ (key==='confirmed'?'': ' · '+
    esc(job[key].map(id=>tracks.get(id)||id).join(', ')))+'</li>':'')).join('');
  const error=job.error||job.warning||'';
@@ -566,11 +577,11 @@ function studioView(){
       '<div class="compact-option"><span><strong>'+esc(m.name)+'</strong><small>'+esc(m.artist)+' · '+
       esc(globalThis.CrateflowMatching.versionLabel(globalThis.CrateflowMatching.candidateVersion(m)))+
       (m.externalId?' · '+esc(m.externalId):'')+'</small></span>'+
-      '<button class="btn" data-act="studioChoose" data-id="'+t.id+'" data-index="'+i+'" '+(!m.externalId?'disabled title="Beatport track unavailable"':'')+'>USE THIS TRACK</button></div>'
+      '<button class="btn" data-act="studioChoose" data-id="'+esc(t.id)+'" data-index="'+i+'" '+(!m.externalId?'disabled title="Beatport track unavailable"':'')+'>USE THIS TRACK</button></div>'
     ).join(''):'<div class="compact-option"><span><strong>Track not found on Beatport.</strong></span></div>')+
-    '<div class="compact-review-actions"><button class="btn" data-act="studioRetry" data-id="'+t.id+'" '+(studioRunning?'disabled':'')+'>SEARCH AGAIN</button></div></div>':'';
-  const retryOption=result==='error'?'<div class="compact-review-actions"><button class="btn" data-act="studioRetry" data-id="'+t.id+'" '+(studioRunning?'disabled':'')+'>RETRY</button></div>':'';
-  return '<div class="compact-track"><input class="compact-check" type="checkbox" data-id="'+t.id+'" aria-label="Select '+esc(t.title)+'" '+(checked?'checked':'')+'>'+
+    '<div class="compact-review-actions"><button class="btn" data-act="studioRetry" data-id="'+esc(t.id)+'" '+(studioRunning?'disabled':'')+'>SEARCH AGAIN</button></div></div>':'';
+  const retryOption=result==='error'?'<div class="compact-review-actions"><button class="btn" data-act="studioRetry" data-id="'+esc(t.id)+'" '+(studioRunning?'disabled':'')+'>RETRY</button></div>':'';
+  return '<div class="compact-track"><input class="compact-check" type="checkbox" data-id="'+esc(t.id)+'" aria-label="Select '+esc(t.title)+'" '+(checked?'checked':'')+'>'+
    '<div class="compact-name"><strong>'+esc(t.title)+'</strong><small>'+esc(t.artist)+(t.remix?' · '+esc(t.remix):'')+'</small>'+
    (result==='error'?'<small class="studio-error">'+esc(t.studioError||'Search failed')+'</small>':'')+selectedInfo+'</div>'+
    '<div class="compact-status"><span class="pill '+(['exact','id_ready','manual'].includes(result)?'':'pending')+'">'+status+'</span></div>'+
@@ -1039,19 +1050,36 @@ function bind(){const on=(sel,fn,event='click')=>{let e=$(sel);if(e)e.addEventLi
 });on('#studioPaste',v=>{studioInput=v.target.value},'input');on('#studioImport',studioImport);on('#studioSync',()=>studioSync());on('#studioShowAll',()=>{studioShowAll=true;render()});on('#studioSelectAll',studioToggleAll);on('#studioCheckExport',checkBeatportExport);on('#studioReviewExport',reviewBeatportExport);document.querySelectorAll('.compact-check').forEach(el=>el.addEventListener('change',()=>{const t=state.tracks.find(t=>t.id===el.dataset.id);if(t){t.studioSelected=el.checked;persist();render()}}));on('#studioExport',studioOpenPlaylistDialog);on('#studioUseExisting',()=>{studioInput='';render()});on('#studioExtended',v=>{state.settings.preferExtended=v.target.checked;persist();render()},'change');on('#finishOnboarding',()=>{localStorage.setItem('crateflow_onboarded','yes');nav('overview')});on('#onboardImport',()=>{localStorage.setItem('crateflow_onboarded','yes');nav('import')});on('#preferExtended',e=>{state.settings.preferExtended=e.target.checked;persist();render()},'change');on('#searchFirstMatch',()=>{let t=state.tracks.find(t=>!t.match?.url&&t.status==='pending');if(!t)return toast('No unmatched tracks');window.open(storeSearch(t),'_blank','noopener');logSync(t,'Search opened','Beatport search opened');render()});on('#catalogBatch',lookupQueue);on('#downloadHistory',()=>download('crateflow-sync-history.json',JSON.stringify(state.syncHistory,null,2),'application/json'));on('#saveMusicApiSlug',()=>{let v=($('#musicApiSlug')?.value||'').trim().toLowerCase();if(!/^[a-z0-9][a-z0-9-]{1,62}$/.test(v))return toast('Check MusicAPI account slug');state.settings.musicApiSlug=v;persist();toast('MusicAPI slug saved')});on('#verifyBeatportLogin',()=>verifyBeatportConnection());on('#startBeatportLogin',()=>{const slug='tracky';state.settings.musicApiSlug=slug;persist();sessionStorage.removeItem('beatport_server_verified');sessionStorage.removeItem('beatport_auth_attempt');sessionStorage.removeItem('beatport_claimed_user');sessionStorage.removeItem('beatport_callback_notice');const returnUrl=location.origin+'/';window.location.assign('https://app.musicapi.com/'+slug+'/beatport/auth?returnUrl='+encodeURIComponent(returnUrl))});on('#exportBeatportRequest',()=>{const request='Subject: Beatport API integration request for CRATEFLOW\\n\\nHello Beatport Partnerships Team,\\n\\nI am developing CRATEFLOW, a personal DJ music manager that imports Spotify playlist metadata, identifies corresponding Beatport releases and lets the account holder review candidates before purchase. I would like to ask about authorized API access and OAuth integration. Specifically, are track search, user purchase history and adding an approved track to the user\'s default shopping cart available to third-party partners? Are there licensing, commercial or technical requirements? Checkout and payment would remain on Beatport.com.\\n\\nWebsite: '+location.origin+'\\n\\nThank you.';navigator.clipboard.writeText(request.replaceAll('\\n','\\n')).then(()=>toast('API request copied')).catch(()=>toast('Clipboard permission denied'))});on('#importPasted',importPasted);on('#clearPasted',()=>{$('#pasteTracks').value=''});on('#uploadCsv',()=>$('#csv').click());on('#quickAdd',()=>{let title=$('#quickTitle').value,artist=$('#quickArtist').value;if(!title.trim())return toast('Title required');importTracks([{title,artist}],'Manual additions');nav('library')});on('#search',e=>{search=e.target.value;let pos=e.target.selectionStart;render();$('#search').focus();$('#search').setSelectionRange(pos,pos)},'input');on('#filter',e=>{filter=e.target.value;render()},'change');on('#searchNext',()=>{let t=state.tracks.find(t=>t.status==='pending');if(t)window.open(beatport(t),'_blank','noopener');else toast('Nothing pending')});on('#copyQueue',()=>{navigator.clipboard.writeText(state.tracks.filter(t=>t.status==='pending').map(t=>t.artist+' – '+t.title).join('\n')).then(()=>toast('Copied'))});on('#beatportSite',()=>window.open('https://www.beatport.com','_blank','noopener'));on('#backup',()=>download('crateflow-backup.json',JSON.stringify(state,null,2),'application/json'));on('#restoreBtn',()=>$('#restore').click());on('#csvExport',csvExport);on('#xmlExport',xmlExport);on('#clearAll',()=>{if(confirm('Delete all local tracks and playlists?')){state=structuredClone(defaults);persist();render()}})}
 document.addEventListener('click',e=>{let p=e.target.closest('[data-page]');if(p)return nav(p.dataset.page);let a=e.target.closest('[data-act]');if(!a)return;let t=state.tracks.find(t=>t.id===a.dataset.id);if(!t)return;if(a.dataset.act==='studioRetry')return studioSync([t.id]);if(a.dataset.act==='studioChange'){t.studioResult='review';t.studioCandidate=null;if(['musicapi','api.sh'].includes(t.match?.source))delete t.match;persist();return render();}if(a.dataset.act==='studioChoose')return studioChoose(t,Number(a.dataset.index||0));if(a.dataset.act==='catalogLookup')return lookupMusicApi(t);if(a.dataset.act==='acceptCatalog')return applyCatalogCandidate(t,Number(a.dataset.index||0));if(['searchMatch','saveMatch','markCart','markUnmatched'].includes(a.dataset.act))return handleMatching(a.dataset.act,t);if(a.dataset.act==='beatport')window.open(beatport(t),'_blank','noopener');else if(a.dataset.act==='edit')edit(t);else if(a.dataset.act==='delete'&&confirm('Remove '+t.title+'?'))deleteTrack(t)});
 $('#csv').addEventListener('change',async e=>{let file=e.target.files[0];if(!file)return;try{const rows=csvParse(await file.text());if(!rows.length){toast('CSV must include title and artist columns.');return}const added=importTracks(rows,file.name.replace(/\.csv$/i,''));nav('import');if(added&&sessionStorage.getItem('beatport_server_verified')==='yes')await studioSync()}catch(err){toast(err.message)}finally{e.target.value=''}});
+function restoreLibrary(backup,revision){
+ const previous={state,search,filter,playlistFilter,playlistEditorOpen,mixSelectedId};
+ state={...defaults,...backup};
+ search='';filter='all';playlistFilter='all';playlistEditorOpen=false;mixSelectedId=null;
+ try{
+  // Rendering and the single storage commit run synchronously in the same turn.
+  render();
+  if(revision!==localStorage.getItem(storage))throw new Error('Library changed before save');
+  persist();
+ }catch{
+  ({state,search,filter,playlistFilter,playlistEditorOpen,mixSelectedId}=previous);
+  render();
+  throw new Error('Could not restore the backup. Your existing library was kept.');
+ }
+}
+
 $('#restore').addEventListener('change',async event=>{
  const file=event.target.files[0];
  if(!file)return;
+ const revision=lastSavedState;
  try{
-  const backup=JSON.parse(await file.text());
-  if(!Array.isArray(backup?.tracks)||!Array.isArray(backup?.playlists))throw Error('Invalid backup');
+  let source;
+  try{source=await file.text()}
+  catch{throw new Error('Could not read the backup file. Your existing library was kept.')}
+  const backup=globalThis.CrateflowLibraryBackup.parse(source);
   if(!confirm('Replace your current library?'))return;
-  const next={...defaults,...backup,settings:{...defaults.settings,...backup.settings},
-   syncHistory:Array.isArray(backup.syncHistory)?backup.syncHistory:[]};
-  persist(next);
-  state=next;
-  search='';filter='all';playlistFilter='all';playlistEditorOpen=false;
-  render();toast('Backup restored');
+  if(revision!==lastSavedState||revision!==localStorage.getItem(storage))
+   throw new Error('The library changed while reading the backup. Reload before restoring it.');
+  restoreLibrary(backup,revision);
+  toast('Backup restored');
  }catch(error){toast(error.message)}
  finally{event.target.value=''}
 });

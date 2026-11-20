@@ -57,12 +57,14 @@ export function createImportBrowser(fetch, savedState) {
     runInContext(source, context, { filename });
   }
 
+  const restoreFile = text => getElement('#restore').dispatch('change', { target: { files: [{ text }] } });
   return {
     importText: input => context.importTextRows(input),
     snapshot: () => JSON.parse(storage.get('crateflow_v1')),
-    restoreBackup: snapshot => getElement('#restore').dispatch('change', {
-      target: { files: [{ text: async () => JSON.stringify(snapshot) }] },
-    }),
+    restoreBackup: snapshot => restoreFile(async () => JSON.stringify(snapshot)),
+    restoreFile,
+    toastMessage: () => getElement('#toast').textContent,
+    failNextRender: runInContext('() => { const original = render; render = () => { render = original; throw Error("Fixture render failed"); }; }', context),
     deleteTrack: id => documentListeners.get('click')({
       target: { closest: selector => selector === '[data-act]' ? { dataset: { act: 'delete', id } } : null },
     }),

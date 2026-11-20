@@ -21,6 +21,10 @@ At startup `app.js` sets `defaults = {tracks:[],playlists:[],settings:{}}`, then
 
 Note: actual legacy fields may vary across versions; do not assume all records contain the listed optional fields.
 
+Local JSON restore requires track IDs, titles and one of the four workflow statuses, plus playlist IDs and names. Library and playlist IDs must be unique within their respective lists. Repeated occurrences in a playlist, provider IDs shared by different records, missing optional metadata, legacy assignments and unresolved string references are retained. Known fields used by the application are validated before confirmation. Unknown fields survive the round trip. File, validation, rendering or storage failures keep the previous active library. The restore does not alter the separate Beatport journal.
+
+The local Chromium regression in `tests/browser/backup-safety.py` can be run against the built `dist` directory on a loopback HTTP server. It covers validation before confirmation, repeat order and inert text from a backup or simulated provider response.
+
 ## 3. Suggested field mapping (validate first)
 | Legacy field | Target | Rule |
 | --- | --- | --- |
