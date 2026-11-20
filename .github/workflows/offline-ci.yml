@@ -1,0 +1,37 @@
+name: Offline CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Offline tests and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: '26.x'
+          package-manager-cache: false
+
+      - name: Check JavaScript syntax
+        run: git ls-files -z -- '*.js' | xargs -0 -n 1 node --check
+
+      # Node's permission model blocks network and child processes. The test
+      # runner runs in one process so it needs neither permission.
+      - name: Run offline tests
+        run: node --permission --allow-fs-read=. --test-isolation=none --test tests/*.test.js
+
+      - name: Build static assets offline
+        run: node --permission --allow-fs-read=. --allow-fs-write=dist --allow-fs-write='dist/*' build.js

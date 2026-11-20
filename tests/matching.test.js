@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { assertRegression } from './fixtures/known-regression.js';
 import '../matching.js';
 
 const matching=globalThis.CrateflowMatching;
@@ -140,4 +141,14 @@ test('matching an extra-credits release still refuses an explicitly wrong remix'
  const source=track('Doa (Original Mix)','Traumer');
  const result=matches(source,[candidate('Doa (Radio Edit)','Traumer, Anton, antraum','123')])[0];
  assert.equal(result.assessment.autoEligible,false);
+});
+
+test('a named Radio Remix does not auto-match the same remixer’s Extended Remix', t => {
+ const source=track('Closer (Alex Radio Remix)');
+ const ranked=matches(source,[candidate('Closer (Alex Extended Remix)','Adriatique','121')]);
+ const result=matching.bestAutomatic(source,ranked)?.externalId??null;
+ assertRegression(t,result,null,{
+  knownResult:'121',
+  reason:'Named remix parsing drops the radio and extended qualifiers.',
+ });
 });
