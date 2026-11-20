@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readLocalPlaylistModel } from '../lib/playlist-model.js';
+import '../lib/playlist-model.js';
 import { createImportBrowser } from './fixtures/browser-import.js';
+
+const { readLocalPlaylistModel } = globalThis.CrateflowPlaylistModel;
 
 test('membership rows reference the library and preserve order, repeated entries and shared tracks', () => {
   const snapshot = {

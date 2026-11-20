@@ -1,5 +1,6 @@
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const storage='crateflow_v1',defaults={tracks:[],playlists:[],settings:{}};
+const playlistModel=globalThis.CrateflowPlaylistModel;
 const beatportExports=globalThis.CrateflowBeatportExports.create({
  storage:localStorage,locks:globalThis.navigator?.locks,
  fetch:(...args)=>fetch(...args),newId:()=>crypto.randomUUID(),wait:ms=>sleep(ms),
@@ -34,20 +35,6 @@ function findImportedTrack(index,identity){
  if(entries.length===1)return entries[0].track;
  return entries.find(entry=>entry.isrc===isrc&&entry.version.key===version.key)?.track||null;
 }
-function playlistTrackIds(playlist){
- return Array.isArray(playlist.trackIds)?playlist.trackIds:
-  state.tracks.filter(track=>track.playlistId===playlist.id).map(track=>track.id);
-}
-function newPlaylistEntries(previous,incoming,keepOccurrences){
- const existing=new Map();
- for(const id of previous)existing.set(id,keepOccurrences?(existing.get(id)||0)+1:1);
- return incoming.filter(id=>{
-  const count=existing.get(id)||0;
-  if(keepOccurrences)existing.set(id,Math.max(0,count-1));
-  else existing.set(id,1);
-  return count===0;
- });
-}
 function storeImportedTracks(groups){
  const index=new Map(),addedTracks=[],playlists=[...state.playlists];
  const remember=(track,identity)=>{
@@ -59,10 +46,8 @@ function storeImportedTracks(groups){
  for(const track of state.tracks)remember(track,importIdentity(matchingSource(track)));
  let linked=0,createdPlaylists=0,reused=0;
  for(const {rows,name,spotifyPlaylistId} of groups){
-  const position=playlists.findIndex(playlist=>spotifyPlaylistId?
-   playlist.spotifyPlaylistId===spotifyPlaylistId:!playlist.spotifyPlaylistId&&playlist.name===name);
+  const position=playlistModel.findImportPlaylistIndex(playlists,name,spotifyPlaylistId);
   const playlist=playlists[position]||{id:uid(),name,...(spotifyPlaylistId?{spotifyPlaylistId}:{})};
-  const prior=playlistTrackIds(playlist);
   const incoming=[];
   for(const row of rows){
    const title=String(row.title||'').trim(),artist=String(row.artist||'Unknown Artist').trim();
@@ -72,16 +57,15 @@ function storeImportedTracks(groups){
    if(existing){incoming.push(existing.id);reused++;continue}
    const track={id:uid(),title,artist,remix:row.remix||'',album:row.album||'',genre:row.genre||'',
     bpm:row.bpm||'',key:row.key||'',filePath:row.filePath||'',status:row.status||'pending',isrc:row.isrc||'',
-    spotifyId:row.spotifyId||'',spotifyUrl:row.spotifyUrl||'',playlistId:playlist.id,source:row.source||'manual',date:Date.now()};
+    spotifyId:row.spotifyId||'',spotifyUrl:row.spotifyUrl||'',source:row.source||'manual',date:Date.now()};
    addedTracks.push(track);
    remember(track,identity);
    incoming.push(track.id);
   }
-  const entries=newPlaylistEntries(prior,incoming,Boolean(spotifyPlaylistId));
-  linked+=entries.length;
-  if(position<0||entries.length){
-   const trackIds=spotifyPlaylistId?[...prior,...entries]:[...entries.reverse(),...prior];
-   const nextPlaylist={...playlist,trackIds};
+  const {playlist:nextPlaylist,linked:addedMemberships}=playlistModel.addImportedMemberships(
+   playlist,state.tracks,incoming,Boolean(spotifyPlaylistId));
+  linked+=addedMemberships;
+  if(position<0||addedMemberships){
    if(position<0){playlists.push(nextPlaylist);createdPlaylists++}
    else playlists[position]=nextPlaylist;
   }
@@ -107,19 +91,12 @@ const card=(label,num,extra)=>'<div class="card"><label>'+label+'</label><strong
 const action=(label,act,id)=>'<button class="btn" data-act="'+act+'" data-id="'+id+'">'+label+'</button>';
 const beatport=t=>'https://www.beatport.com/search?q='+encodeURIComponent(t.artist+' '+t.title+(t.remix?' '+t.remix:''));
 function visible(){
- let tracks=state.tracks;
- if(playlistFilter!=='all'){
-  const playlist=state.playlists.find(item=>item.id===playlistFilter);
-  if(!playlist)return [];
-  const byId=new Map(state.tracks.map(track=>[track.id,track]));
-  tracks=playlistTrackIds(playlist).map(id=>byId.get(id)).filter(Boolean);
- }
+ const tracks=playlistFilter==='all'?state.tracks:playlistModel.tracksInPlaylist(state,playlistFilter);
  return tracks.filter(t=>(filter==='all'||t.status===filter)&&norm(t.title+' '+t.artist+' '+t.genre).includes(norm(search)));
 }
 function deleteTrack(track){
  const next={...state,tracks:state.tracks.filter(item=>item.id!==track.id),
-  playlists:state.playlists.map(playlist=>Array.isArray(playlist.trackIds)&&playlist.trackIds.includes(track.id)?
-   {...playlist,trackIds:playlist.trackIds.filter(id=>id!==track.id)}:playlist)};
+  playlists:playlistModel.removeTrackMemberships(state.playlists,track.id)};
  persist(next);
  state=next;
  render();
