@@ -562,7 +562,7 @@ async function runAutoPipeline(ids,limit=40){
    try{
     if(!['exact','id_ready','manual'].includes(t.studioResult)){
      // The MusicAPI catalog route has a separate 12 requests/minute throttle.
-     const matchWait=5200-(Date.now()-lastMatchAt);
+     const matchWait=6300-(Date.now()-lastMatchAt);
      if(lastMatchAt&&matchWait>0)await sleep(matchWait);
      lastMatchAt=Date.now();
      const matches=await searchCatalogTrack(t);
