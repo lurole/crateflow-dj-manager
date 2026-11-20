@@ -81,6 +81,7 @@ test('a shared Spotify track retains membership in both imported playlists', asy
 
   const snapshot = browser.snapshot();
   assert.equal(snapshot.tracks.filter(track => track.spotifyId === sharedTrackId).length, 1);
+  assert.ok(snapshot.tracks.every(track => !Object.hasOwn(track, 'playlistId')));
   assert.deepEqual(playlistMemberships(snapshot), [
     [firstTrackId, sharedTrackId],
     [secondTrackId, sharedTrackId],
@@ -106,6 +107,10 @@ test('playlist pages and intentional repetitions retain source order across reim
   assert.deepEqual(playlistMemberships(previous), [[sharedTrackId, firstTrackId, sharedTrackId]]);
   assert.deepEqual(Array.from(browser.visiblePlaylist(previous.playlists[0].id), track => track.spotifyId),
     [sharedTrackId, firstTrackId, sharedTrackId]);
+  const reloaded = createImportBrowser(undefined, previous);
+  assert.deepEqual(Array.from(reloaded.visiblePlaylist(previous.playlists[0].id), track => track.spotifyId),
+    [sharedTrackId, firstTrackId, sharedTrackId]);
+  assert.deepEqual(reloaded.snapshot(), previous);
   assert.equal(browser.visiblePlaylist('all').length, 2);
 
   const repeat = await browser.importText(input);
@@ -146,6 +151,75 @@ test('legacy membership and edited track data survive reimport using the same Sp
   assert.deepEqual(snapshot.tracks, [legacy]);
   assert.deepEqual(snapshot.playlists[0], legacyPlaylist);
   assert.deepEqual(snapshot.playlists[1].trackIds, ['old-track']);
+});
+
+test('restoring a legacy backup preserves its membership until an explicit import edits that playlist', async () => {
+  const tracks = [
+    fixtureTrack('Second', { id: 'second', playlistId: 'legacy', status: 'downloaded', filePath: '/music/second.mp3' }),
+    fixtureTrack('First', { id: 'first', playlistId: 'legacy', status: 'pending' }),
+    fixtureTrack('Unassigned', { id: 'hidden', playlistId: 'empty', status: 'pending' }),
+  ];
+  const playlists = [
+    { id: 'legacy', name: 'Quick Import' },
+    { id: 'empty', name: 'Empty', trackIds: [] },
+  ];
+  const browser = createImportBrowser(undefined);
+  await browser.restoreBackup({ tracks, playlists });
+
+  assert.deepEqual(Array.from(browser.visiblePlaylist('legacy'), track => track.id), ['second', 'first']);
+  assert.equal(browser.visiblePlaylist('empty').length, 0);
+  assert.deepEqual(browser.snapshot().tracks, tracks);
+  assert.deepEqual(browser.snapshot().playlists, playlists);
+
+  await browser.importText('Fixture Artist – New first\nFixture Artist – New second');
+  const snapshot = browser.snapshot();
+  assert.deepEqual(snapshot.tracks.slice(2), tracks);
+  assert.deepEqual(snapshot.playlists[1], playlists[1]);
+  assert.deepEqual(snapshot.playlists[0].trackIds, [snapshot.tracks[0].id, snapshot.tracks[1].id, 'second', 'first']);
+  assert.deepEqual(Array.from(browser.visiblePlaylist('legacy'), track => track.title),
+    ['New second', 'New first', 'Second', 'First']);
+});
+
+test('the playlist filter leaves damaged references and other saved records intact', async () => {
+  const tracks = [
+    fixtureTrack('Good', { id: 'good', status: 'pending' }),
+    fixtureTrack('First duplicate', { id: 'duplicate', status: 'pending' }),
+    fixtureTrack('Second duplicate', { id: 'duplicate', status: 'pending' }),
+  ];
+  const playlists = [{ id: 'playlist', name: 'Quick Import', trackIds: ['duplicate', 'missing', 'good'] }];
+  const savedState = { tracks, playlists, settings: {} };
+  const browser = createImportBrowser(undefined, savedState);
+
+  assert.deepEqual(Array.from(browser.visiblePlaylist('playlist'), track => track.id), ['good']);
+  assert.equal(browser.visiblePlaylist('all').length, 3);
+  assert.deepEqual(browser.snapshot(), savedState);
+
+  await browser.importText('Fixture Artist – New track');
+  const snapshot = browser.snapshot();
+  assert.deepEqual(snapshot.tracks.slice(1), tracks);
+  assert.deepEqual(snapshot.playlists[0].trackIds, [snapshot.tracks[0].id, ...playlists[0].trackIds]);
+});
+
+test('confirmed library deletion cleans all of a track’s playlist occurrences and keeps the other entries ordered', () => {
+  const shared = fixtureTrack('Shared', { id: 'shared', status: 'pending', playlistId: 'legacy' });
+  const retained = fixtureTrack('Retained', { id: 'retained', status: 'pending', playlistId: 'legacy' });
+  const other = fixtureTrack('Other', { id: 'other', status: 'pending' });
+  const playlists = [
+    { id: 'legacy', name: 'Legacy' },
+    { id: 'first', name: 'First', trackIds: ['shared', 'retained', 'shared', 'other'] },
+    { id: 'second', name: 'Second', trackIds: ['other', 'shared', 'retained'] },
+  ];
+  const browser = createImportBrowser(undefined, { tracks: [shared, retained, other], playlists, settings: {} });
+  browser.deleteTrack('shared');
+
+  const snapshot = browser.snapshot();
+  assert.deepEqual(snapshot.tracks, [retained, other]);
+  assert.deepEqual(snapshot.playlists, [
+    playlists[0],
+    { ...playlists[1], trackIds: ['retained', 'other'] },
+    { ...playlists[2], trackIds: ['other', 'retained'] },
+  ]);
+  assert.deepEqual(Array.from(browser.visiblePlaylist('legacy'), track => track.id), ['retained']);
 });
 
 test('matching text without a Spotify ID cannot absorb a Spotify or unverified playlist entry', async () => {
