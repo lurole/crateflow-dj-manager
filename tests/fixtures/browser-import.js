@@ -10,6 +10,7 @@ const scripts = Array.from(html.matchAll(/<script\b[^>]*\bsrc="\/([^"?]+)(?:\?[^
 export function createImportBrowser(fetch, savedState) {
   const storage = new Map();
   if (savedState) storage.set('crateflow_v1', JSON.stringify(savedState));
+  let failWrite = false;
   const elements = new Map();
   const documentListeners = new Map();
   function getElement(selector) {
@@ -34,7 +35,10 @@ export function createImportBrowser(fetch, savedState) {
     confirm: () => true,
     localStorage: {
       getItem: key => storage.get(key) ?? null,
-      setItem: (key, value) => storage.set(key, value),
+      setItem: (key, value) => {
+        if (failWrite) throw new Error('Fixture storage quota exhausted');
+        storage.set(key, value);
+      },
     },
     sessionStorage: { getItem: () => null },
     document: {
@@ -63,6 +67,9 @@ export function createImportBrowser(fetch, savedState) {
       target: { closest: selector => selector === '[data-act]' ? { dataset: { act: 'delete', id } } : null },
     }),
     visiblePlaylist: runInContext('id => { playlistFilter = id; return visible(); }', context),
+    savePlaylistEdit: runInContext('(id, edit) => { page = "library"; playlistFilter = id; playlistEditorOpen = true; return savePlaylistEdit(id, edit); }', context),
+    replaceStorage: snapshot => storage.set('crateflow_v1', JSON.stringify(snapshot)),
+    failStorageWrites: () => { failWrite = true; },
     checkMatch: context.studioMatchResult,
     searchCatalog: context.searchCatalogTrack,
   };
