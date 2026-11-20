@@ -73,7 +73,10 @@ async function searchCatalogTrack(t){
   const candidates=globalThis.CrateflowMatching.rankCandidates(src,cached.candidates,state.settings.preferExtended);
   t.catalog={status:'cached',candidates,provider:cached.provider,checkedAt:Date.now()};
   const best=globalThis.CrateflowMatching.bestAutomatic(src,candidates,state.settings.preferExtended);
-  if(best)enrichTrackDjMetadata(t,best);
+  if(best){
+   enrichTrackDjMetadata(t,best);
+   if(cached.provider==='api.sh')t.djEnrichment={status:'catalog_cache',provider:'API.SH',checkedAt:Date.now()};
+  }
   return candidates;
  }
  let candidates=[],provider='api.sh',primaryError='';
@@ -236,20 +239,71 @@ function studioOpenPlaylistDialog(){
  studioPlaylistName='CRATEFLOW '+new Date().toISOString().slice(0,10);
  studioModal='playlist';render();
 }
+async function resolveMusicApiExportId(t){
+ const selected=t.studioCandidate||{};
+ if(selected.provider!=='api.sh'&&selected.exportIdVerified!==false){
+  if(!selected.externalId)throw Error('Missing MusicAPI track ID');
+  return String(selected.externalId);
+ }
+ const sourceId=String(selected.beatportId||selected.externalId||'');
+ if(t.exportMapping?.sourceId===sourceId&&t.exportMapping?.musicApiId&&
+   Date.now()-t.exportMapping.checkedAt<30*86400000)return t.exportMapping.musicApiId;
+ const fromMusicApi=await fetchMusicApiCandidates(t);
+ const original=matchingSource(t);
+ const candidates=fromMusicApi.filter(x=>{
+  const good=globalThis.CrateflowMatching.assess(original,x,state.settings.preferExtended);
+  if(!good.autoEligible)return false;
+  const key1=String(selected.isrc||'').toUpperCase(),key2=String(x.isrc||'').toUpperCase();
+  if(key1&&key2&&key1!==key2)return false;
+  const id1=String(selected.beatportId||''),id2=String(x.beatportId||'');
+  if(id1&&id2&&id1!==id2)return false;
+  const sameTitle=globalThis.CrateflowMatching.titleCore(selected.name)===
+                  globalThis.CrateflowMatching.titleCore(x.name);
+  if(!sameTitle)return false;
+  const bridge=globalThis.CrateflowMatching.assess(
+    {title:selected.name,artist:original.artist,remix:original.remix||''},x,state.settings.preferExtended);
+  return bridge.autoEligible;
+ });
+ const best=globalThis.CrateflowMatching.bestAutomatic(original,candidates,state.settings.preferExtended);
+ if(!best)throw Error('Beatport and MusicAPI could not uniquely confirm the same release');
+ t.exportMapping={sourceId,musicApiId:String(best.externalId),checkedAt:Date.now(),
+  source:'verified-musicapi-mapping'};
+ persist();
+ return String(best.externalId);
+}
 async function exportToBeatportPlaylist(){
  if(studioExporting||studioRunning)return;
  const eligible=studioChosen().filter(studioEligible);
- const unique=[...new Map(eligible.map(t=>[String(t.studioCandidate.externalId),t])).values()];
- if(!unique.length)return toast('No confirmed Beatport tracks to export');
- if(unique.length>20)return toast('Maximum 20 tracks per playlist. Select fewer tracks.');
+ if(!eligible.length)return toast('No confirmed Beatport tracks to export');
+ if(eligible.length>20)return toast('Maximum 20 tracks per playlist. Select fewer tracks.');
  if(sessionStorage.getItem('beatport_server_verified')!=='yes')return toast('Connect your Beatport account first');
  const title=String(document.querySelector('#studioPlaylistTitle')?.value||studioPlaylistName||'').trim().slice(0,75);
  if(!title)return toast('Enter a playlist name');
  studioExporting=true;studioError='';studioModal='';render();
  try{
-  const trackIds=unique.map(t=>String(t.studioCandidate.externalId));
-  const tracks=unique.map(t=>({id:String(t.studioCandidate.externalId),
-    title:t.importTitle||t.title,artist:t.importArtist||t.artist,
+  const mappings=[],unresolved=[];
+  let lastMapAt=0;
+  for(const t of eligible){
+   try{
+    if(t.studioCandidate?.provider==='api.sh'&&!t.exportMapping?.musicApiId){
+     const wait=5200-(Date.now()-lastMapAt);
+     if(lastMapAt&&wait>0)await sleep(wait);
+     lastMapAt=Date.now();
+    }
+    const id=await resolveMusicApiExportId(t);
+    mappings.push({id,t});
+   }catch(error){unresolved.push(t.artist+' – '+(t.importTitle||t.title)+': '+String(error.message||error))}
+  }
+  if(unresolved.length){
+   studioError='Export stopped before creating a playlist: '+unresolved.slice(0,4).join(' | ')+
+    (unresolved.length>4?' (and '+(unresolved.length-4)+' more)':'');
+   persist();toast('Some Beatport IDs could not be verified');return;
+  }
+  const distinct=new Map();
+  for(const item of mappings)if(!distinct.has(item.id))distinct.set(item.id,item);
+  const unique=[...distinct.values()];
+  const trackIds=unique.map(x=>x.id);
+  const tracks=unique.map(({id,t})=>({id,title:t.importTitle||t.title,artist:t.importArtist||t.artist,
     remix:t.importRemix??t.remix??'',isrc:String(t.isrc||'').toUpperCase()}));
   const response=await fetch('/api/export-beatport-playlist',{
    method:'POST',headers:{'Content-Type':'application/json'},
@@ -260,7 +314,7 @@ async function exportToBeatportPlaylist(){
    const suffix=data.playlistId?' Playlist ID: '+String(data.playlistId):'';
    throw Error((data.error||'Beatport playlist transfer failed')+suffix);
   }
-  const labels=new Map(unique.map(t=>[String(t.studioCandidate.externalId),(t.importArtist||t.artist)+' – '+(t.importTitle||t.title)]));
+  const labels=new Map(unique.map(({id,t})=>[id,(t.importArtist||t.artist)+' – '+(t.importTitle||t.title)]));
   const failedIds=[...(data.missing||[]),...(data.mismatched||[]),...(data.unavailable||[])];
   studioExportResult={name:data.name,added:data.added||0,requested:data.requested||unique.length,
    verified:data.verified===true,missing:data.missing||[],mismatched:data.mismatched||[],
@@ -271,8 +325,7 @@ async function exportToBeatportPlaylist(){
   if(data.verified===true){
    const confirmed=new Set(data.confirmed||[]);
    const bad=new Set([...(data.missing||[]),...(data.mismatched||[]),...(data.unavailable||[])]);
-   for(const t of unique){
-    const id=String(t.studioCandidate.externalId);
+   for(const {id,t} of unique){
     if(confirmed.has(id)){
      t.beatportPlaylistId=data.playlistId;t.beatportPlaylistExported=true;t.beatportPlaylistVerified=true;
      delete t.beatportExportIssue;
@@ -309,7 +362,7 @@ function studioView(){
  const remaining=tracks.filter(t=>!t.studioResult).length;
  const resumable=tracks.filter(t=>t.status==='pending'&&
   (!t.studioResult||t.studioResult==='error'||
-   (['exact','id_ready','manual'].includes(t.studioResult)&&!t.djEnrichment?.checkedAt&&
+   (['exact','id_ready','manual'].includes(t.studioResult)&&t.catalog?.provider!=='api.sh'&&!t.djEnrichment?.checkedAt&&
     (globalThis.CrateflowMix.bpmValue(t.bpm)===null||!globalThis.CrateflowMix.parseKey(t.key)||!String(t.genre||'').trim())))).length;
  const percent=studioProgress.total?Math.round(studioProgress.done/studioProgress.total*100):0;
  const list=studioShowAll?tracks:tracks.slice(0,30);
@@ -517,8 +570,9 @@ async function runAutoPipeline(ids,limit=40){
     }
     if(['exact','id_ready','manual'].includes(t.studioResult)){
      matched++;
-     if(globalThis.CrateflowMix.bpmValue(t.bpm)===null||
-        !globalThis.CrateflowMix.parseKey(t.key)||!String(t.genre||'').trim()){
+     if(t.catalog?.provider!=='api.sh'&&
+       (globalThis.CrateflowMix.bpmValue(t.bpm)===null||
+        !globalThis.CrateflowMix.parseKey(t.key)||!String(t.genre||'').trim())){
       // Space out paid calls to avoid API.SH beta burst limits.
       const wait=6300-(Date.now()-lastEnrichmentAt);
       if(lastEnrichmentAt&&wait>0)await sleep(wait);
@@ -587,6 +641,7 @@ function studioChoose(t,index){
  const c=t.catalog?.candidates?.[index];
  if(!c?.externalId)return toast('Beatport track ID missing. Cannot confirm this track.');
  t.studioCandidate={...c};
+ delete t.exportMapping;
  // The DJ explicitly reselected a catalog candidate after a failed export.
  delete t.beatportExportIssue;
  // Explicit user selection also authorizes using Beatport's release title.
