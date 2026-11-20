@@ -34,6 +34,16 @@ MusicAPI credentials `MUSICAPI_CLIENT_ID` and `MUSICAPI_CLIENT_SECRET` are requi
 
 Single Spotify **track** URLs continue to use MusicLink, independently of MusicAPI. The playlist endpoint uses only per-instance best-effort IP limits (12 requests/minute, 120/day); use durable authenticated quotas and a provider-usage budget before opening broad public access.
 
+## Optimized API.SH-first catalog pipeline (2026-11-20)
+
+The import UI stays the same. For a new Spotify song the browser resolves the original title/artist via MusicLink (single link) or MusicAPI Core (playlist), then tries the **API.SH Beatport catalog** via `POST /api/search-beatport-primary`. That one response may contain title, artists, mix, ISRC, BPM, Camelot key and genre; no second API.SH call is made for a successful API.SH primary lookup. MusicAPI connected-Beatport search remains the fallback when the primary result is unavailable, non-unique, or not safely matched. Matching uses the original Spotify/import identity and refuses indistinguishable releases, other artists, mix conflicts or conflicting ISRCs.
+
+Successful catalog results are cached locally per original song identity for up to 30 days, capped at 250 entries. This browser-local cache is a pragmatic MVP measure, not a central or cross-device cache. API.SH search currently has a best-effort quota of 10 calls/minute and 40/day per IP/server instance; paid lookups are throttled. The old MusicAPI matching and API.SH enrichment routes remain as fallbacks. Existing MusicAPI-matched library entries need not be re-imported.
+
+**Critical ID boundary:** API.SH returns numeric Beatport public catalog IDs but MusicAPI playlist calls require connected-service item IDs, which must not be presumed identical. The API.SH result is marked `exportIdVerified:false`. Only when the user clicks Create Beatport Playlist does CRATEFLOW retrieve MusicAPI candidates, compare original title/artist/version/ISRC to both providers, and cache a verified mapping against the original source fingerprint. If any selected song cannot be mapped uniquely, playlist creation stops **before** any write. The export then retains its server-side playlist read-back verification. This is the basis for reducing duplicate search/API credits without risking a provider-ID mix-up.
+
+This client-driven optimization is not a persistent background queue; keep the browser tab open for large jobs. Catalog/playlist accuracy and provider mapping still require live validation on representative real tracks.
+
 ## One-click import and automatic DJ enrichment
 
 Import & Match now runs in this order: user-pasted Spotify track or public playlist URL → existing MusicLink (single track) or MusicAPI (playlist) import → connected Beatport/MusicAPI title, artist and version matching → verified API.SH Beatport lookup for optional BPM, Camelot key and genre. Each successfully retrieved field is recorded with an API.SH source marker, and existing metadata is never overwritten. Ambiguous/wrong-version matches are left for review, not silently assigned.
