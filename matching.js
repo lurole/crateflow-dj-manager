@@ -12,12 +12,12 @@
     if(!A.size||!B.size)return 0;
     return 2*[...A].filter(x=>B.has(x)).length/(A.size+B.size);
   };
-  const artistName=s=>words(s).replace(/\\b(and|feat|ft|featuring|with|vs)\\b/g," ").replace(/\\s+/g," ").trim();
+  const artistName=s=>words(s).replace(/\b(and|feat|ft|featuring|with|vs)\b/g," ").replace(/\s+/g," ").trim();
   // Streaming services sometimes credit just the principal artist whereas Beatport
   // lists all credited collaborators. Compare complete artist identities, not
   // the whole joined credit string nor substrings (e.g. "Ann" vs "Anna").
   const splitArtists=(s,structured)=>{
-    const value=Array.isArray(structured)&&structured.length?structured:String(s||"").split(/[,;]+|\\s+(?:&|feat\\.?|ft\\.?|featuring|with|vs\\.?)\\s+/i);
+    const value=Array.isArray(structured)&&structured.length?structured:String(s||"").split(/[,;]+|\s+(?:&|feat\.?|ft\.?|featuring|with|vs\.?)\s+/i);
     return [...new Set(value.map(v=>artistName(v)).filter(v=>v&&v!=="unknown artist"))];
   };
   const compareArtists=(track,candidate)=>{
