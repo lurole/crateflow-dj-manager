@@ -246,8 +246,11 @@ async function resolveMusicApiExportId(t){
   return String(selected.externalId);
  }
  const sourceId=String(selected.beatportId||selected.externalId||'');
- if(t.exportMapping?.sourceId===sourceId&&t.exportMapping?.musicApiId&&
-   Date.now()-t.exportMapping.checkedAt<30*86400000)return t.exportMapping.musicApiId;
+ const source=matchingSource(t);
+ const sourceFingerprint=[norm(source.title),norm(source.artist),norm(source.remix||''),source.isrc||''].join('|');
+ if(t.exportMapping?.sourceId===sourceId&&t.exportMapping?.sourceFingerprint===sourceFingerprint&&
+   t.exportMapping?.musicApiId&&Date.now()-t.exportMapping.checkedAt<30*86400000)
+   return t.exportMapping.musicApiId;
  const fromMusicApi=await fetchMusicApiCandidates(t);
  const original=matchingSource(t);
  const candidates=fromMusicApi.filter(x=>{
@@ -266,7 +269,7 @@ async function resolveMusicApiExportId(t){
  });
  const best=globalThis.CrateflowMatching.bestAutomatic(original,candidates,state.settings.preferExtended);
  if(!best)throw Error('Beatport and MusicAPI could not uniquely confirm the same release');
- t.exportMapping={sourceId,musicApiId:String(best.externalId),checkedAt:Date.now(),
+ t.exportMapping={sourceId,sourceFingerprint,musicApiId:String(best.externalId),checkedAt:Date.now(),
   source:'verified-musicapi-mapping'};
  persist();
  return String(best.externalId);
@@ -404,7 +407,7 @@ function studioView(){
  '<div class="flow-hero-bottom"><span>MADE FOR THE WAY YOU LISTEN</span><span class="flow-scroll">SCROLL TO WORKSPACE ↓</span></div></section>'+
  '<div class="flow-workspace-heading"><span>THE WORKSPACE / 001</span><h2>MAKE IT FLOW<span>.</span></h2><p>Import your music. Find the right match. Build your next Beatport playlist.</p></div>'+
  '<div class="studio-status"><span class="pill">NO SPOTIFY LOGIN REQUIRED</span><span class="pill '+(beatport?'':'pending')+'">Beatport '+(beatport?'verified':'not connected')+'</span><button class="btn" data-page="welcome">BEATPORT CONNECTION</button></div>'+
- '<div class="panel studio-main flow-import-panel"><div class="eyebrow">01 / COPY & PASTE TRACKS</div><p class="note cf-paste-help">Paste Spotify song or playlist URLs, or Artist – Title lines. Import & Match automatically resolves Spotify tracks, matches Beatport and enriches BPM, genre and Camelot key through API.SH when available. API.SH queries consume credits (up to 40 per import); large playlists can be continued in batches. Keep this tab open until processing finishes.</p><textarea id="studioPaste" class="field" rows="5" placeholder="https://open.spotify.com/track/5KBUE75BEZMGmDnfW8y2gd&#10;Adriatique – Closer (Extended Mix)">'+esc(studioInput)+'</textarea><div class="row gap"><button class="btn primary" id="studioImport" '+(studioRunning||studioResolving?'disabled':'')+'>'+(studioResolving?'IMPORTING TRACKS…':studioRunning?'MATCHING & ENRICHING…':'IMPORT & MATCH')+'</button><button class="btn" id="uploadCsv" '+(studioResolving?'disabled':'')+'>UPLOAD CSV</button><label class="studio-toggle"><input id="studioExtended" type="checkbox" '+(state.settings.preferExtended?'checked':'')+'> Prefer Extended Mix</label></div>'+(studioResolving?'<p class="note" role="status" aria-live="polite">Resolving Spotify links '+studioLinkProgress.done+' / '+studioLinkProgress.total+'…</p>':'')+'<p class="cf-provider"><a href="https://musiclink.one/" target="_blank" rel="noopener noreferrer">Track metadata by MusicLink</a></p></div>'+
+ '<div class="panel studio-main flow-import-panel"><div class="eyebrow">01 / COPY & PASTE TRACKS</div><p class="note cf-paste-help">Paste Spotify songs, playlists or Artist – Title lines. Import & Match uses API.SH first for Beatport matching, BPM, key and genre in one lookup. MusicAPI is used as a fallback and to verify playlist IDs when exporting. The catalog cache avoids repeating recent successful lookups. API.SH calls use credits (up to 40 per import); keep this tab open while processing.</p><textarea id="studioPaste" class="field" rows="5" placeholder="https://open.spotify.com/track/5KBUE75BEZMGmDnfW8y2gd&#10;Adriatique – Closer (Extended Mix)">'+esc(studioInput)+'</textarea><div class="row gap"><button class="btn primary" id="studioImport" '+(studioRunning||studioResolving?'disabled':'')+'>'+(studioResolving?'IMPORTING TRACKS…':studioRunning?'MATCHING & ENRICHING…':'IMPORT & MATCH')+'</button><button class="btn" id="uploadCsv" '+(studioResolving?'disabled':'')+'>UPLOAD CSV</button><label class="studio-toggle"><input id="studioExtended" type="checkbox" '+(state.settings.preferExtended?'checked':'')+'> Prefer Extended Mix</label></div>'+(studioResolving?'<p class="note" role="status" aria-live="polite">Resolving Spotify links '+studioLinkProgress.done+' / '+studioLinkProgress.total+'…</p>':'')+'<p class="cf-provider"><a href="https://musiclink.one/" target="_blank" rel="noopener noreferrer">Track metadata by MusicLink</a></p></div>'+
  '<div class="panel studio-main flow-tracks-panel"><div class="compact-header"><div><div class="eyebrow">02 / MATCHED MUSIC</div><h2>'+tracks.length+' songs</h2></div><div class="row"><button class="btn" id="studioSync" '+(studioRunning||studioResolving||!resumable?'disabled':'')+'>'+(studioRunning?'SEARCHING…':'CONTINUE NEXT 10')+'</button><button class="btn primary" id="studioExport" '+(studioRunning||studioResolving||studioExporting||!ready.length?'disabled':'')+'>CREATE BEATPORT PLAYLIST</button></div></div>'+
  '<p class="note">Selected: '+selected.length+' songs · '+ready.length+' ready to add to a new Beatport playlist.</p>'+
  '<div class="compact-summary"><span><b>'+exact+'</b> found</span><span><b>'+review+'</b> need attention</span><span><b>'+remaining+'</b> pending</span><span><b>'+ready.length+'</b> ready</span></div>'+
