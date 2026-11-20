@@ -432,6 +432,13 @@ body:not(.landing-mode) #view .playlist-actions .btn:not([data-playlist-action=r
 body:not(.landing-mode) #view .playlist-editor :focus-visible{outline:2px solid #e8d7ba!important;outline-offset:3px}
 .playlist-drop-before{box-shadow:inset 0 3px #e8d7ba}
 .playlist-drop-after{box-shadow:inset 0 -3px #e8d7ba}
+.playlist-controls{gap:8px;margin:0 0 16px}
+#playlistFilter{min-width:0;max-width:100%}
+#playlist-editor-title,.studio-dialog h2,.studio-dialog p{overflow-wrap:anywhere}
+.studio-dialog:is(dialog){position:fixed;inset:0;width:min(calc(100% - 32px),525px);max-height:calc(100% - 32px);overflow:auto}
+dialog.studio-dialog::backdrop{background:rgba(9,11,7,.83);backdrop-filter:blur(10px)}
+.studio-dialog .dialog-status:not(:empty){margin-top:12px}
+.studio-dialog :focus-visible{outline:2px solid #e8d7ba!important;outline-offset:3px}
 @media(max-width:560px){
  .playlist-entry{grid-template-columns:auto minmax(0,1fr);gap:7px}
  .playlist-actions{grid-column:2}

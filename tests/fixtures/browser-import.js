@@ -67,6 +67,8 @@ export function createImportBrowser(fetch, savedState) {
       target: { closest: selector => selector === '[data-act]' ? { dataset: { act: 'delete', id } } : null },
     }),
     visiblePlaylist: runInContext('id => { playlistFilter = id; return visible(); }', context),
+    setLibraryView: runInContext('(id, term, status) => { page = "library"; playlistFilter = id; search = term; filter = status; playlistEditorOpen = true; }', context),
+    libraryViewState: runInContext('() => ({ playlistFilter, search, filter, playlistEditorOpen, trackIds: visible().map(track => track.id) })', context),
     savePlaylistEdit: runInContext('(id, edit) => { page = "library"; playlistFilter = id; playlistEditorOpen = true; return savePlaylistEdit(id, edit); }', context),
     replaceStorage: snapshot => storage.set('crateflow_v1', JSON.stringify(snapshot)),
     failStorageWrites: () => { failWrite = true; },
