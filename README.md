@@ -71,9 +71,13 @@ Tracks, playlists, status, matching history and file paths are currently saved i
 
 Before public launch: provision dedicated user authentication, cloud database with row-level access control, durable quotas/rate limiting, secure per-user account binding, terms/privacy disclosures, and commercial integration rights.
 
+## Cloud foundation
+
+Phase 1 adds an isolated Supabase Auth route plus versioned PostgreSQL schema and owner policies. See the [Supabase setup and verification guide](docs/SUPABASE_SETUP.md) and the [Phase 0 integration plan](docs/PHASE_0_INTEGRATION.md).
+
 ## Local development
 
-Requires Node 18+:
+Requires Node.js 22 or newer. Install dependencies with `npm ci`.
 
 ```bash
 npm start
