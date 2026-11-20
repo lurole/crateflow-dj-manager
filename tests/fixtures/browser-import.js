@@ -5,8 +5,9 @@ import { createContext, runInContext } from 'node:vm';
 const scripts = ['clipboard-import.js', 'matching.js', 'mix-compatibility.js', 'app.js']
   .map(name => [name, readFileSync(new URL('../../' + name, import.meta.url), 'utf8')]);
 
-export function createImportBrowser(fetch) {
+export function createImportBrowser(fetch, savedState) {
   const storage = new Map();
+  if (savedState) storage.set('crateflow_v1', JSON.stringify(savedState));
   const elements = new Map();
   function getElement(selector) {
     if (!elements.has(selector)) {
@@ -49,5 +50,8 @@ export function createImportBrowser(fetch) {
   return {
     importText: input => context.importTextRows(input),
     snapshot: () => JSON.parse(storage.get('crateflow_v1')),
+    visiblePlaylist: runInContext('id => { playlistFilter = id; return visible(); }', context),
+    checkMatch: context.studioMatchResult,
+    searchCatalog: context.searchCatalogTrack,
   };
 }
